@@ -325,7 +325,7 @@ class HomeScreen extends StatelessWidget {
                     style: AppTextStyles.labelMd.copyWith(letterSpacing: 0.8)),
                 const SizedBox(height: 4),
                 Text(
-                  'Daging sapi segar? Simpan di chiller < 4°C (1-2 hari). Bekukan di freezer untuk penyimpanan lama.',
+                  'Daging sapi segar? Simpan di chiller < 4°C (1-2 hari). Bekukan di freezer untuk penyimpanan lebih lama (4-12bulan).',
                   style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary, height: 1.4),
                 ),
               ],
