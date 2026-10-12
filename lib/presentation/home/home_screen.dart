@@ -30,6 +30,8 @@ class HomeScreen extends StatelessWidget {
                     _buildQuickActions(),
                     const SizedBox(height: AppSpacing.md),
                     _buildSafetyDisclaimer(),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildStorageRecommendation(),
                   ],
                 ),
               ),
@@ -291,6 +293,48 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
+// ─── REKOMENDASI PENYIMPANAN ──────────────────────────────────
+  Widget _buildStorageRecommendation() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.borderDefault, width: 2),
+        boxShadow: [AppShadows.hardSmall()],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryFixed,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.borderDefault, width: 1.5),
+            ),
+            child: const Icon(Icons.kitchen, color: AppColors.textPrimary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('REKOMENDASI PENYIMPANAN',
+                    style: AppTextStyles.labelMd.copyWith(letterSpacing: 0.8)),
+                const SizedBox(height: 4),
+                Text(
+                  'Daging sapi segar? Simpan di chiller < 4°C (1-2 hari). Bekukan di freezer untuk penyimpanan lama.',
+                  style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 // ─── PRESSABLE CARD HELPER ──────────────────────────────────
 class _PressableCard extends StatefulWidget {
