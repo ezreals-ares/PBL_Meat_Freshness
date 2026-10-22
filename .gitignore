@@ -12,7 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 sys/
-
+DOKUMENTASI.md
 # IntelliJ related
 *.iml
 *.ipr
