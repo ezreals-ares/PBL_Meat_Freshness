@@ -1,7 +1,5 @@
-import 'package:flutter/material.dart';
-import '../../core/theme.dart';
-
-/// Domain model for a meat freshness classification result.
+/// Domain entity untuk hasil klasifikasi kesegaran daging.
+/// Murni Dart — tanpa import Flutter, tanpa serialisasi database.
 class ClassificationResult {
   final int? id;
   final String imagePath;
@@ -10,7 +8,7 @@ class ClassificationResult {
   final double confidence; // 0.0 - 1.0
   final DateTime createdAt;
 
-  ClassificationResult({
+  const ClassificationResult({
     this.id,
     required this.imagePath,
     this.meatType,
@@ -19,7 +17,7 @@ class ClassificationResult {
     required this.createdAt,
   });
 
-  // ─── Display helpers ──────────────────────────────────────
+  // ─── Display helpers (pure Dart) ───────────────────────────
 
   /// Label status yang mudah dibaca.
   String get displayName {
@@ -49,61 +47,13 @@ class ClassificationResult {
     }
   }
 
-  /// Icon for this status.
-  IconData get statusIcon {
-    switch (result) {
-      case 'fresh':
-        return Icons.check_circle;
-      case 'half_fresh':
-        return Icons.warning;
-      case 'spoiled':
-        return Icons.block;
-      default:
-        return Icons.help;
-    }
-  }
-
-  /// Color for this status.
-  Color get statusColor {
-    switch (result) {
-      case 'fresh':
-        return AppColors.statusFresh;
-      case 'half_fresh':
-        return AppColors.statusHalf;
-      case 'spoiled':
-        return AppColors.statusSpoiled;
-      default:
-        return AppColors.surfaceContainer;
-    }
-  }
-
   /// Whether the confidence is below the low-confidence threshold.
   bool get isLowConfidence => confidence < 0.5;
 
   /// Confidence as a percentage string, e.g. "94.0%".
   String get confidencePercent => '${(confidence * 100).toStringAsFixed(1)}%';
 
-  // ─── SQLite serialization ─────────────────────────────────
-
-  Map<String, dynamic> toMap() => {
-        if (id != null) 'id': id,
-        'image_path': imagePath,
-        'meat_type': meatType,
-        'result': result,
-        'confidence': confidence,
-        'created_at': createdAt.toIso8601String(),
-      };
-
-  factory ClassificationResult.fromMap(Map<String, dynamic> map) =>
-      ClassificationResult(
-        id: map['id'] as int?,
-        imagePath: map['image_path'] as String,
-        meatType: map['meat_type'] as String?,
-        result: map['result'] as String,
-        confidence: (map['confidence'] as num).toDouble(),
-        createdAt: DateTime.parse(map['created_at'] as String),
-      );
-
+  /// Create a copy with updated fields.
   ClassificationResult copyWith({
     int? id,
     String? imagePath,
