@@ -1,22 +1,32 @@
 import '../../core/errors/app_exceptions.dart';
 import '../../domain/models/classification_result.dart';
+import '../../domain/repositories/classification_repository.dart';
 import '../db/classification_dao.dart';
+import '../models/classification_model.dart';
 
-/// Repository wrapping the DAO with error handling.
-class ClassificationRepository {
-  final ClassificationDao _dao = ClassificationDao();
+/// Implementasi konkret [ClassificationRepository] menggunakan SQLite (sqflite).
+///
+/// Semua exception dari DAO dikonversi ke [StorageException] sebelum
+/// sampai ke domain/presentation — UI tidak pernah menerima error mentah.
+class ClassificationRepositoryImpl implements ClassificationRepository {
+  final ClassificationDao _dao;
 
-  /// Save a classification result. Returns the result with its generated id.
+  /// [dao] disuntikkan dari luar agar bisa diganti dengan mock saat testing
+  /// (Dependency Inversion Principle).
+  ClassificationRepositoryImpl({required this._dao});
+
+  @override
   Future<ClassificationResult> save(ClassificationResult result) async {
     try {
-      final id = await _dao.insert(result);
-      return result.copyWith(id: id);
+      final model = ClassificationModel.fromEntity(result);
+      final id = await _dao.insert(model);
+      return model.copyWith(id: id);
     } catch (e) {
       throw StorageException('Failed to save classification result.', e);
     }
   }
 
-  /// Get all classification results, newest first.
+  @override
   Future<List<ClassificationResult>> getAll() async {
     try {
       return await _dao.getAll();
@@ -25,7 +35,7 @@ class ClassificationRepository {
     }
   }
 
-  /// Get a single result by id.
+  @override
   Future<ClassificationResult?> getById(int id) async {
     try {
       return await _dao.getById(id);
@@ -34,7 +44,7 @@ class ClassificationRepository {
     }
   }
 
-  /// Delete a result by id.
+  @override
   Future<void> delete(int id) async {
     try {
       await _dao.delete(id);
@@ -43,7 +53,7 @@ class ClassificationRepository {
     }
   }
 
-  /// Delete all results.
+  @override
   Future<void> deleteAll() async {
     try {
       await _dao.deleteAll();
@@ -52,7 +62,7 @@ class ClassificationRepository {
     }
   }
 
-  /// Get count of saved results.
+  @override
   Future<int> count() async {
     try {
       return await _dao.count();

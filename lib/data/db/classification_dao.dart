@@ -1,17 +1,24 @@
 import 'package:sqflite/sqflite.dart';
 import '../../domain/models/classification_result.dart';
+import '../models/classification_model.dart';
 import 'db_helper.dart';
 
 /// Data Access Object for the classifications table.
+///
+/// Hanya kelas ini yang boleh menyentuh SQL queries untuk tabel classifications.
 class ClassificationDao {
-  final DbHelper _dbHelper = DbHelper.instance;
+  final DbHelper _dbHelper;
+
+  /// [dbHelper] disuntikkan dari luar agar bisa diganti dengan mock saat testing.
+  ClassificationDao({DbHelper? dbHelper})
+      : _dbHelper = dbHelper ?? DbHelper.instance;
 
   /// Insert a new classification and return the generated id.
-  Future<int> insert(ClassificationResult result) async {
+  Future<int> insert(ClassificationModel model) async {
     final db = await _dbHelper.database;
     return db.insert(
       DbHelper.tableClassifications,
-      result.toMap(),
+      model.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -23,7 +30,7 @@ class ClassificationDao {
       DbHelper.tableClassifications,
       orderBy: 'created_at DESC',
     );
-    return maps.map((m) => ClassificationResult.fromMap(m)).toList();
+    return maps.map((m) => ClassificationModel.fromMap(m)).toList();
   }
 
   /// Get a single classification by id.
@@ -36,7 +43,7 @@ class ClassificationDao {
       limit: 1,
     );
     if (maps.isEmpty) return null;
-    return ClassificationResult.fromMap(maps.first);
+    return ClassificationModel.fromMap(maps.first);
   }
 
   /// Delete a classification by id. Returns number of rows deleted.
