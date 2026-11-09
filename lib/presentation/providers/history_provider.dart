@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
-import '../../data/repositories/classification_repository.dart';
 import '../../domain/models/classification_result.dart';
+import '../../domain/repositories/classification_repository.dart';
 
 /// Provider managing the history screen state.
+///
+/// Semua dependensi disuntikkan via constructor (Dependency Inversion Principle).
+/// Provider tidak pernah membuat dependency sendiri.
 class HistoryProvider extends ChangeNotifier {
-  final ClassificationRepository _repository = ClassificationRepository();
+  final ClassificationRepository _repository;
+
+  HistoryProvider({required this._repository});
 
   List<ClassificationResult> _items = [];
   bool _isLoading = false;

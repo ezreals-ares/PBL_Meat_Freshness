@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
+import '../../core/result_ui_ext.dart';
 import '../../domain/models/classification_result.dart';
 
 /// Layar Hasil — menampilkan hasil klasifikasi setelah analisis.

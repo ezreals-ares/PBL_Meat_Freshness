@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../data/ml/tflite_service.dart';
 import '../../data/ml/image_preprocessor.dart';
-import '../../data/repositories/classification_repository.dart';
 import '../../domain/models/classification_result.dart';
+import '../../domain/repositories/classification_repository.dart';
 
 /// Scan flow states.
 enum ScanState { idle, imageSelected, processing, success, error }
 
 /// Provider managing the capture → preview → analyze → result flow.
+///
+/// Semua dependensi disuntikkan via constructor (Dependency Inversion Principle).
+/// Provider tidak pernah membuat dependency sendiri.
 class ScanProvider extends ChangeNotifier {
-  final TfliteService _tfliteService = TfliteService();
-  final ClassificationRepository _repository = ClassificationRepository();
+  final TfliteService _tfliteService;
+  final ClassificationRepository _repository;
+
+  ScanProvider({
+    required this._tfliteService,
+    required this._repository,
+  });
 
   ScanState _scanState = ScanState.idle;
   String? _selectedImagePath;

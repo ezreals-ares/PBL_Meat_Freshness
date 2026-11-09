@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme.dart';
+import '../../core/result_ui_ext.dart';
 import '../../domain/models/classification_result.dart';
 import '../../widgets/neo_badge.dart';
 import '../providers/history_provider.dart';
