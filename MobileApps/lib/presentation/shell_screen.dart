@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import 'home/home_screen.dart';
 import 'capture/capture_screen.dart';
 import 'history/history_screen.dart';
+import 'providers/history_provider.dart';
 
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
@@ -13,6 +15,8 @@ class ShellScreen extends StatefulWidget {
 
 class _ShellScreenState extends State<ShellScreen> {
   int _currentIndex = 0;
+
+  static const int _historyTabIndex = 2;
 
   @override
   void initState() {
@@ -26,6 +30,10 @@ class _ShellScreenState extends State<ShellScreen> {
   ];
 
   void _onTabSelected(int index) {
+    // Refresh riwayat setiap kali tab Riwayat dibuka
+    if (index == _historyTabIndex) {
+      context.read<HistoryProvider>().loadHistory();
+    }
     setState(() => _currentIndex = index);
   }
 
