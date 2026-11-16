@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../theme/theme.dart';
 
 /// Neobrutalist button with press-down animation (translate + shadow shrink).
 class NeoButton extends StatefulWidget {

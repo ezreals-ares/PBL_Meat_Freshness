@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../theme/theme.dart';
 
 /// Status badge for freshness results — FRESH / HALF-FRESH / SPOILED.
 class NeoBadge extends StatelessWidget {

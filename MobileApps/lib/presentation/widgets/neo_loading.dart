@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../theme/theme.dart';
 
 /// Neobrutalist loading indicator — chunky bordered spinner + bold text label.
 ///

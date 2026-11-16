@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../data/ml/tflite_service.dart';
-import '../../data/ml/image_preprocessor.dart';
 import '../../domain/models/classification_result.dart';
-import '../../domain/repositories/classification_repository.dart';
+import '../../domain/models/prediction_model_type.dart';
+import '../../domain/usecases/analyze_meat_usecase.dart';
 
 /// Scan flow states.
 enum ScanState { idle, imageSelected, processing, success, error }
@@ -10,18 +9,18 @@ enum ScanState { idle, imageSelected, processing, success, error }
 /// Provider managing the capture → preview → analyze → result flow.
 ///
 /// Semua dependensi disuntikkan via constructor (Dependency Inversion Principle).
-/// Provider tidak pernah membuat dependency sendiri.
+/// Presentation hanya bergantung pada domain layer ([AnalyzeMeatUseCase]) dan
+/// menerima `Failure` sebagai data — tidak pernah menangkap exception mentah.
 class ScanProvider extends ChangeNotifier {
-  final TfliteService _tfliteService;
-  final ClassificationRepository _repository;
+  final AnalyzeMeatUseCase _analyzeMeatUseCase;
 
   ScanProvider({
-    required this._tfliteService,
-    required this._repository,
+    required this._analyzeMeatUseCase,
   });
 
   ScanState _scanState = ScanState.idle;
   String? _selectedImagePath;
+  PredictionModelType _selectedModel = PredictionModelType.netv2;
   ClassificationResult? _currentResult;
   String? _errorMessage;
 
@@ -29,9 +28,9 @@ class ScanProvider extends ChangeNotifier {
 
   ScanState get scanState => _scanState;
   String? get selectedImagePath => _selectedImagePath;
+  PredictionModelType get selectedModel => _selectedModel;
   ClassificationResult? get currentResult => _currentResult;
   String? get errorMessage => _errorMessage;
-  bool get isModelLoaded => _tfliteService.isModelLoaded;
 
   // ─── Actions ──────────────────────────────────────────────
 
@@ -43,6 +42,13 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Pilih model klasifikasi AI (`netv2` atau `svm`).
+  void selectModel(PredictionModelType model) {
+    if (_selectedModel == model) return;
+    _selectedModel = model;
+    notifyListeners();
+  }
+
   /// Clear the current selection and go back to idle.
   void clearSelection() {
     _selectedImagePath = null;
@@ -51,7 +57,7 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Run analysis on the selected image.
+  /// Run analysis on the selected image using the active model endpoint.
   Future<void> analyzeImage() async {
     if (_selectedImagePath == null) return;
 
@@ -59,28 +65,17 @@ class ScanProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      // 1. Copy image to app storage
-      final storedPath =
-          await ImagePreprocessor.copyToAppStorage(_selectedImagePath!);
+    final outcome = await _analyzeMeatUseCase(
+      sourceImagePath: _selectedImagePath!,
+      modelType: _selectedModel,
+    );
 
-      // 2. Run classification (currently mock, will be real TFLite)
-      final output = await _tfliteService.classify(storedPath);
-
-      // 3. Create result
-      final result = ClassificationResult(
-        imagePath: storedPath,
-        result: output['result'] as String,
-        confidence: (output['confidence'] as num).toDouble(),
-        createdAt: DateTime.now(),
-      );
-
-      // 4. Save to database
-      _currentResult = await _repository.save(result);
-      _scanState = ScanState.success;
-    } catch (e) {
-      _errorMessage = 'Analysis failed. Please try again.';
+    if (outcome.failure != null) {
+      _errorMessage = outcome.failure!.message;
       _scanState = ScanState.error;
+    } else {
+      _currentResult = outcome.result;
+      _scanState = ScanState.success;
     }
 
     notifyListeners();
@@ -93,11 +88,5 @@ class ScanProvider extends ChangeNotifier {
     _scanState = ScanState.idle;
     _errorMessage = null;
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _tfliteService.dispose();
-    super.dispose();
   }
 }

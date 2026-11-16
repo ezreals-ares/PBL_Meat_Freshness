@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
+import '../theme/theme.dart';
 
 class HomeScreen extends StatelessWidget {
   /// Dipanggil oleh ShellScreen untuk navigasi ke tab lain (0=Beranda, 1=Pindai, 2=Riwayat).
