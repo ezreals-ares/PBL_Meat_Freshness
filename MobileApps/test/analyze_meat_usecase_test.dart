@@ -100,6 +100,8 @@ void main() {
     expect(outcome.result?.id, 42);
     expect(outcome.result?.result, 'fresh');
     expect(outcome.result?.confidence, 0.94);
+    expect(outcome.result?.modelType, PredictionModelType.netv2);
+    expect(outcome.result?.probabilities?['fresh'], 0.94);
     expect(fakeClassificationRepo.lastSaved?.id, 42);
   });
 
@@ -121,6 +123,8 @@ void main() {
     expect(fakeClassifier.lastRequestedModel, PredictionModelType.svm);
     expect(outcome.result?.result, 'half_fresh');
     expect(outcome.result?.displayName, 'SETENGAH SEGAR');
+    expect(outcome.result?.modelType, PredictionModelType.svm);
+    expect(outcome.result?.segmentationFallback, isTrue);
   });
 
   test('AnalyzeMeatUseCase mengembalikan NetworkFailure tanpa menyimpan ke DB',

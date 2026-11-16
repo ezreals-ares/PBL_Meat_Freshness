@@ -1,6 +1,6 @@
 # 🥩 MeatFresh AI — Dokumentasi Proyek Lengkap
 
-> Aplikasi Flutter untuk **deteksi kesegaran daging** secara on-device menggunakan kamera & model Machine Learning (TFLite), dengan antarmuka bergaya **Neobrutalism**.
+> Aplikasi Flutter untuk **deteksi kesegaran daging** menggunakan kamera & API FastAPI (MobileNetV2 & SVM), dengan antarmuka bergaya **Neobrutalism** dan arsitektur **Clean Architecture + SOLID**.
 
 ---
 
@@ -13,25 +13,26 @@
 5. [Penjelasan Setiap File](#5-penjelasan-setiap-file)
    - [Entry Point](#-entry-point)
    - [Core Layer](#-core-layer)
-   - [Data Layer — Database](#-data-layer--database-sqlite)
-   - [Data Layer — Machine Learning](#-data-layer--machine-learning)
+   - [Data Layer — API (FastAPI + Dio)](#-data-layer--api-fastapi--dio)
+   - [Data Layer — Database (SQLite)](#-data-layer--database-sqlite)
+   - [Data Layer — Models & Errors](#-data-layer--models--errors)
    - [Data Layer — Repository](#-data-layer--repository)
    - [Domain Layer](#-domain-layer)
    - [Presentation Layer — Providers](#-presentation-layer--providers-state-management)
-   - [Presentation Layer — Screens](#-presentation-layer--screens)
-   - [Widgets](#-widgets-reusable-neobrutalist-components)
-   - [Assets & Sistem](#-assets--sys)
+   - [Presentation Layer — Screens & Theme](#-presentation-layer--screens--theme)
+   - [Presentation Layer — Widgets](#-presentation-layer--widgets)
+   - [Tests](#-tests)
 6. [Alur Kerja Aplikasi](#6-alur-kerja-aplikasi)
 7. [Database Schema](#7-database-schema)
 8. [Sistem Desain Neobrutalism](#8-sistem-desain-neobrutalism)
-9. [Refactor Clean Architecture & SOLID](#9-refactor-clean-architecture--solid)
+9. [Refactor Clean Architecture, SOLID & Integrasi API](#9-refactor-clean-architecture-solid--integrasi-api)
 10. [Status Pengembangan & TODO](#10-status-pengembangan--todo)
 
 ---
 
 ## 1. Gambaran Umum Aplikasi
 
-**MeatFresh AI** adalah aplikasi mobile berbasis Flutter yang membantu pengguna mendeteksi kesegaran daging secara visual menggunakan kamera smartphone. Aplikasi menganalisis foto daging dan mengklasifikasikannya ke dalam tiga kategori:
+**MeatFresh AI** adalah aplikasi mobile berbasis Flutter yang membantu pengguna mendeteksi kesegaran daging secara visual menggunakan kamera atau galeri smartphone. Gambar dikirim ke backend **FastAPI** (`/predict/netv2` atau `/predict/svm`) untuk diklasifikasikan ke dalam tiga kategori:
 
 | Label | Kode | Emoji | Warna |
 |-------|------|-------|-------|
@@ -39,7 +40,7 @@
 | Setengah Segar | `half_fresh` | ⚠️ | Kuning (`#FFC93C`) |
 | Busuk | `spoiled` | ⛔ | Merah (`#FF4D4D`) |
 
-Semua proses berjalan **sepenuhnya di perangkat** (on-device) — tidak memerlukan koneksi internet. Hasil scan disimpan secara lokal menggunakan SQLite.
+Hasil scan dan salinan gambar disimpan secara lokal menggunakan **SQLite** sehingga riwayat tetap tersedia secara offline.
 
 ---
 
@@ -48,10 +49,11 @@ Semua proses berjalan **sepenuhnya di perangkat** (on-device) — tidak memerluk
 | Package | Versi | Kegunaan |
 |---------|-------|---------|
 | `flutter` | SDK | Framework UI utama |
-| `provider` | ^6.1.5 | State management (ChangeNotifier) |
+| `dio` | ^5.11.1 | HTTP client untuk request multipart ke API FastAPI |
+| `provider` | ^6.1.5 | State management (`ChangeNotifier`) |
 | `sqflite` | ^2.4.2 | Database SQLite lokal |
 | `path` | ^1.9.1 | Utilitas path file |
-| `path_provider` | ^2.1.5 | Akses direktori sistem (Documents, App Data) |
+| `path_provider` | ^2.1.5 | Akses direktori sistem (`Documents`, App Data) |
 | `image_picker` | ^1.1.2 | Ambil foto dari kamera / pilih dari galeri |
 | `permission_handler` | ^11.3.1 | Manajemen izin kamera & storage |
 | `google_fonts` | ^6.2.1 | Font SpaceGrotesk & PlusJakartaSans |
@@ -66,77 +68,82 @@ Semua proses berjalan **sepenuhnya di perangkat** (on-device) — tidak memerluk
 
 ## 3. Struktur Folder (Project Tree)
 
-```
-PBL_Meat_Freshness/
+```text
+MobileApps/
 │
 ├── lib/                                   ← Source code utama Flutter (Dart)
 │   ├── main.dart                          ← Entry point + wiring DI terpusat
 │   ├── app.dart                           ← Root widget MaterialApp
 │   │
-│   ├── core/                              ← Fondasi lintas layer
-│   │   ├── constants.dart                 ← Konstanta global (label, threshold)
-│   │   ├── theme.dart                     ← Sistem desain Neobrutalism lengkap
-│   │   ├── result_ui_ext.dart             ← Extension Flutter untuk ClassificationResult [BARU]
-│   │   └── errors/
-│   │       └── app_exceptions.dart        ← Hierarki exception custom
+│   ├── core/                              ← Fondasi murni Dart lintas layer
+│   │   ├── constants.dart                 ← Konstanta global (label, threshold, disclaimer)
+│   │   ├── failures.dart                  ← Sealed class Failure (Network, Server, Local, Validation)
+│   │   └── format.dart                    ← Fungsi murni pemformatan tanggal
 │   │
-│   ├── data/                              ← Layer akses data
+│   ├── data/                              ← Layer akses data (API, SQLite, Storage)
+│   │   ├── api/                           ← FastAPI + Dio
+│   │   │   ├── api_endpoints.dart         ← Base URL, endpoint /predict/netv2 & /predict/svm, timeout
+│   │   │   ├── dio_client.dart            ← Factory konfigurasi Dio (BaseOptions)
+│   │   │   └── meat_prediction_remote_datasource.dart  ← Upload multipart & mapping DioException
 │   │   ├── db/                            ← SQLite
 │   │   │   ├── db_helper.dart             ← Singleton DB, buat schema tabel
 │   │   │   └── classification_dao.dart    ← CRUD operations ke tabel DB
-│   │   ├── ml/                            ← Machine Learning
-│   │   │   ├── tflite_service.dart        ← Inferensi model TFLite (saat ini mock)
-│   │   │   └── image_preprocessor.dart    ← Salin & preprocess gambar
-│   │   ├── models/                        ← [BARU] Data models dengan serialisasi
-│   │   │   └── classification_model.dart  ← Model SQLite + Flutter helpers
-│   │   └── repositories/
-│   │       └── classification_repository.dart  ← ClassificationRepositoryImpl [REFACTOR]
+│   │   ├── errors/
+│   │   │   └── app_exceptions.dart        ← Exception internal khusus Data Layer
+│   │   ├── models/                        ← Mapper eksternal (JSON & SQLite)
+│   │   │   ├── classification_model.dart  ← Model SQLite + konversi toEntity()
+│   │   │   └── prediction_response_model.dart ← Parsing JSON FastAPI + normalisasi label
+│   │   └── repositories/                  ← Implementasi kontrak domain (konversi Exception → Failure)
+│   │       ├── classification_repository.dart        ← ClassificationRepositoryImpl
+│   │       ├── local_image_storage_repository.dart   ← LocalImageStorageRepository
+│   │       └── remote_meat_classifier_repository.dart ← RemoteMeatClassifierRepository
 │   │
-│   ├── domain/                            ← Business logic & model data (murni Dart)
+│   ├── domain/                            ← Business logic & kontrak (100% murni Dart)
 │   │   ├── models/
-│   │   │   └── classification_result.dart ← Entity murni tanpa Flutter/DB [BERSIHKAN]
-│   │   └── repositories/                  ← [BARU] Kontrak abstrak repository
-│   │       └── classification_repository.dart  ← Abstract ClassificationRepository
+│   │   │   ├── classification_result.dart ← Entity utama hasil klasifikasi
+│   │   │   ├── prediction_model_type.dart ← Enum pilihan model AI (netv2, svm)
+│   │   │   └── prediction_output.dart     ← Entity output prediksi dari classifier
+│   │   ├── repositories/                  ← Kontrak abstrak (mengembalikan Record + Failure)
+│   │   │   ├── classification_repository.dart
+│   │   │   ├── image_storage_repository.dart
+│   │   │   └── meat_classifier_repository.dart
+│   │   └── usecases/
+│   │       └── analyze_meat_usecase.dart  ← Orkestrasi simpan gambar → prediksi AI → simpan riwayat
 │   │
-│   ├── presentation/                      ← Layer UI
-│   │   ├── shell_screen.dart              ← Wrapper navigasi (Bottom Nav Bar)
-│   │   ├── home/
-│   │   │   └── home_screen.dart           ← Halaman beranda
-│   │   ├── capture/
-│   │   │   └── capture_screen.dart        ← Ambil foto (kamera / galeri)
-│   │   ├── preview/
-│   │   │   └── preview_screen.dart        ← Pratinjau foto sebelum analisis
-│   │   ├── result/
-│   │   │   └── result_screen.dart         ← Tampilkan hasil klasifikasi
-│   │   ├── history/
-│   │   │   └── history_screen.dart        ← Daftar riwayat semua scan
-│   │   └── providers/                     ← State management
-│   │       ├── scan_provider.dart         ← State alur scan [DI via constructor]
-│   │       └── history_provider.dart      ← State halaman riwayat [DI via constructor]
-│   │
-│   └── widgets/                           ← Komponen UI reusable
-│       ├── confidence_bar.dart            ← Progress bar nilai confidence
-│       ├── neo_badge.dart                 ← Badge label status kesegaran
-│       ├── neo_button.dart                ← Tombol neobrutalist + animasi
-│       ├── neo_card.dart                  ← Card container neobrutalist
-│       └── neo_loading.dart               ← Loading overlay neobrutalist
+│   └── presentation/                      ← Layer UI (bebas Dio, SQLite, & Data Layer)
+│       ├── shell_screen.dart              ← Wrapper navigasi (Bottom Nav Bar) + refresh riwayat
+│       ├── home/
+│       │   └── home_screen.dart           ← Halaman beranda
+│       ├── capture/
+│       │   └── capture_screen.dart        ← Ambil foto (kamera / galeri)
+│       ├── preview/
+│       │   └── preview_screen.dart        ← Pratinjau foto sebelum analisis
+│       ├── result/
+│       │   └── result_screen.dart         ← Tampilkan hasil klasifikasi
+│       ├── history/
+│       │   └── history_screen.dart        ← Daftar riwayat semua scan
+│       ├── providers/                     ← State management
+│       │   ├── scan_provider.dart         ← State alur scan [DI via AnalyzeMeatUseCase]
+│       │   └── history_provider.dart      ← State halaman riwayat [DI via ClassificationRepository]
+│       ├── theme/                         ← Desain sistem & ekstensi UI
+│       │   ├── theme.dart                 ← Sistem desain Neobrutalism lengkap
+│       │   └── result_ui_ext.dart         ← Extension UI (statusColor, statusIcon) untuk entity
+│       └── widgets/                       ← Komponen UI reusable
+│           ├── confidence_bar.dart        ← Progress bar nilai confidence
+│           ├── neo_badge.dart             ← Badge label status kesegaran
+│           ├── neo_button.dart            ← Tombol neobrutalist + animasi
+│           ├── neo_card.dart              ← Card container neobrutalist
+│           └── neo_loading.dart           ← Loading overlay neobrutalist
 │
+├── android/                               ← Konfigurasi Android native (izin CAMERA, STORAGE, INTERNET)
 ├── assets/
-│   └── model/                             ← Placeholder model TFLite (.tflite)
-│
-├── sys/                                   ← Dokumentasi internal & referensi desain
-│   ├── MeatFresh_AI_PRD_Design_Neobrutalism.md
-│   ├── MeatFresh_AI_PRD_Engineering.md
-│   └── stitch_pembangun_berbasis_referensi/
-│       ├── history_meatfresh_ai/          ← Referensi UI halaman riwayat
-│       ├── home_meatfresh_ai/             ← Referensi UI halaman beranda
-│       ├── neobrutalist_freshness/        ← Panduan desain neobrutalism
-│       ├── scan_capture_meatfresh_ai/     ← Referensi UI halaman scan
-│       └── scan_result_meatfresh_ai/     ← Referensi UI halaman hasil
-│
-├── android/                               ← Konfigurasi Android native (Gradle, Manifest)
-├── web/                                   ← Konfigurasi Flutter Web
-├── test/                                  ← Folder unit & widget tests
+│   └── model/                             ← Direktori asset model
+├── test/                                  ← Unit & widget tests (11 test)
+│   ├── analyze_meat_usecase_test.dart
+│   ├── format_test.dart
+│   ├── prediction_response_model_test.dart
+│   ├── remote_meat_classifier_repository_test.dart
+│   └── widget_test.dart
 ├── pubspec.yaml                           ← Deklarasi dependensi & assets
 ├── pubspec.lock                           ← Lock file versi dependensi
 ├── analysis_options.yaml                  ← Konfigurasi lint Dart
@@ -148,9 +155,9 @@ PBL_Meat_Freshness/
 
 ## 4. Arsitektur Aplikasi
 
-Proyek ini mengikuti pola **Clean Architecture** yang dimodifikasi untuk Flutter, dengan pemisahan yang jelas antara layer UI, business logic, dan akses data.
+Proyek ini mengikuti pola **Clean Architecture (Layer-first)** dengan arah dependensi ketat menuju ke dalam (**Domain**).
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │                   PRESENTATION LAYER                    │
 │                                                         │
@@ -159,45 +166,43 @@ Proyek ini mengikuti pola **Clean Architecture** yang dimodifikasi untuk Flutter
 │  ├── CaptureScreen → PreviewScreen → ResultScreen       │
 │  └── HistoryScreen                                      │
 │                                                         │
-│  Providers (ChangeNotifier) — menerima abstraksi via DI │
-│  ├── ScanProvider   (alur scan)                         │
-│  └── HistoryProvider (state riwayat)                    │
+│  Providers (ChangeNotifier)                             │
+│  ├── ScanProvider    → bergantung pada AnalyzeMeatUseCase│
+│  └── HistoryProvider → bergantung pada ClassificationRepo│
 └────────────────────┬────────────────────────────────────┘
-                     │ bergantung pada (abstraksi)
+                     │ bergantung pada (abstraksi + Failure)
 ┌────────────────────▼────────────────────────────────────┐
 │                    DOMAIN LAYER                         │
 │                                                         │
-│  ClassificationResult  (entity murni Dart)              │
-│  ClassificationRepository  (abstract — kontrak)         │
+│  Use Case : AnalyzeMeatUseCase                          │
+│  Entities : ClassificationResult, PredictionOutput,     │
+│             PredictionModelType                         │
+│  Kontrak  : ClassificationRepository,                   │
+│             MeatClassifierRepository,                   │
+│             ImageStorageRepository                      │
 └────────────────────┬────────────────────────────────────┘
                      │ mengimplementasikan kontrak
 ┌────────────────────▼────────────────────────────────────┐
 │                     DATA LAYER                          │
 │                                                         │
-│  ClassificationRepositoryImpl (implements kontrak)      │
-│  ClassificationModel  (entity + serialisasi SQLite)     │
-│  ├── ClassificationDao → DbHelper (SQLite)              │
-│  ├── TfliteService (inferensi ML)                       │
-│  └── ImagePreprocessor (copy & preprocess gambar)       │
+│  ClassificationRepositoryImpl   → ClassificationDao → DB  │
+│  RemoteMeatClassifierRepository → RemoteDataSource → Dio│
+│  LocalImageStorageRepository    → File Storage          │
+│  Models: ClassificationModel, PredictionResponseModel   │
 └─────────────────────────────────────────────────────────┘
-                     │ fondasi
+                     │ fondasi (Dart murni)
 ┌────────────────────▼────────────────────────────────────┐
 │                     CORE LAYER                          │
 │                                                         │
-│  constants.dart │ theme.dart │ app_exceptions.dart      │
-│  result_ui_ext.dart  (extension Flutter untuk entity)   │
+│  constants.dart │ failures.dart │ format.dart           │
 └─────────────────────────────────────────────────────────┘
 ```
 
 **Aturan Dependensi (Dependency Rule):**
-- Presentation bergantung ke Domain (abstraksi), **bukan** ke Data.
-- Domain tidak tahu apapun tentang Flutter, Dio, atau SQLite.
-- Data mengimplementasikan kontrak yang didefinisikan Domain.
-- Wiring DI dilakukan **hanya** di `main.dart`.
-
-**State Management** menggunakan **Provider** dengan dua `ChangeNotifier`:
-- `ScanProvider` — disediakan secara global via `MultiProvider` di `main.dart`
-- `HistoryProvider` — disediakan secara global via `MultiProvider` di `main.dart`
+- **Presentation** hanya mengenal **Domain** dan **Core** (0 import `dio`, `sqflite`, atau `data/`).
+- **Domain** dan **Core** 100% **murni Dart** (0 import `package:flutter`, `dio`, `sqflite`, atau `data/`/`presentation/`).
+- **Data** mengimplementasikan kontrak Domain, menampung detail HTTP/SQLite/JSON, dan menangkap seluruh exception untuk dikonversi menjadi `Failure`.
+- **Composition Root (Wiring DI)** dilakukan terpusat di `main.dart`.
 
 ---
 
@@ -207,660 +212,200 @@ Proyek ini mengikuti pola **Clean Architecture** yang dimodifikasi untuk Flutter
 
 ### 📌 Entry Point
 
----
-
 #### `lib/main.dart`
 
-File paling awal yang dieksekusi Flutter saat aplikasi dijalankan, sekaligus berfungsi sebagai **pusat perakitan dependensi (Wiring Dependency Injection)**.
+File paling awal yang dieksekusi Flutter saat aplikasi dijalankan, sekaligus berfungsi sebagai **Composition Root (Wiring Dependency Injection)**.
 
 **Yang dilakukan:**
 1. `WidgetsFlutterBinding.ensureInitialized()` — memastikan binding Flutter siap sebelum plugin digunakan.
-2. `SystemChrome.setPreferredOrientations([portraitUp])` — mengunci orientasi aplikasi ke **portrait** saja.
-3. `SystemChrome.setSystemUIOverlayStyle(...)` — membuat **status bar transparan** dengan ikon gelap agar cocok dengan tema neobrutalism.
-4. **Wiring Dependency Injection (DI)** — Menginstansiasi `ClassificationDao`, `ClassificationRepositoryImpl`, dan `TfliteService` satu kali di tingkat atas.
-5. `runApp(MultiProvider(...))` — menyuntikkan dependensi ke provider:
-   - `ScanProvider(tfliteService: ..., repository: ...)`
-   - `HistoryProvider(repository: ...)`
-
-```dart
-// Wiring DI di main.dart
-final dao = ClassificationDao();
-final repository = ClassificationRepositoryImpl(dao: dao);
-final tfliteService = TfliteService();
-
-runApp(
-  MultiProvider(
-    providers: [
-      ChangeNotifierProvider(
-        create: (_) => ScanProvider(
-          tfliteService: tfliteService,
-          repository: repository,
-        ),
-      ),
-      ChangeNotifierProvider(
-        create: (_) => HistoryProvider(
-          repository: repository,
-        ),
-      ),
-    ],
-    child: const MeatFreshApp(),
-  ),
-);
-```
-
----
+2. `SystemChrome.setPreferredOrientations([portraitUp])` — mengunci orientasi aplikasi ke **portrait**.
+3. `SystemChrome.setSystemUIOverlayStyle(...)` — membuat **status bar transparan** dengan ikon gelap.
+4. **Wiring DI terpusat:** merakit `DioClient.create()`, `MeatPredictionRemoteDataSourceImpl`, `RemoteMeatClassifierRepository`, `LocalImageStorageRepository`, `ClassificationDao`, `ClassificationRepositoryImpl`, dan `AnalyzeMeatUseCase`.
+5. `runApp(MultiProvider(...))` — menyuntikkan `ScanProvider` dan `HistoryProvider` ke widget tree.
 
 #### `lib/app.dart`
 
-Root widget aplikasi `MeatFreshApp` (extends `StatelessWidget`).
-
-**Yang dilakukan:**
-- Membuat `MaterialApp` dengan:
-  - `title: 'MeatFresh AI'`
-  - `theme: buildAppTheme()` — tema neobrutalism dari `core/theme.dart`
-  - `home: ShellScreen()` — layar pertama yang ditampilkan
-  - `debugShowCheckedModeBanner: false` — menghilangkan banner "DEBUG"
+Root widget aplikasi `MeatFreshApp` (`StatelessWidget`) yang membangun `MaterialApp` dengan tema `buildAppTheme()` dari `presentation/theme/theme.dart` dan `home: const ShellScreen()`.
 
 ---
 
-### 🧱 Core Layer
-
----
+### 🧱 Core Layer *(Murni Dart)*
 
 #### `lib/core/constants.dart`
 
-Menyimpan semua **konstanta global** yang dipakai lintas file agar tidak ada *magic string* atau *magic number* yang tersebar.
+Menyimpan konstanta global lintas layer (tanpa URL/endpoint backend):
+- `appName`: `'MeatFresh AI'`
+- `labels`: `['fresh', 'half_fresh', 'spoiled']`
+- `labelDisplayNames`: peta kode label → teks Indonesia (`SEGAR`, `SETENGAH SEGAR`, `BUSUK`)
+- `lowConfidenceThreshold`: `0.5`
+- `disclaimer`: teks peringatan keamanan pangan di layar hasil
 
-| Konstanta | Nilai | Kegunaan |
-|-----------|-------|---------|
-| `modelAssetPath` | `'assets/model/meatfresh_model.tflite'` | Path asset model TFLite |
-| `labelDisplayNames` | `{'fresh': 'SEGAR', 'half_fresh': 'SETENGAH SEGAR', 'spoiled': 'BUSUK'}` | Peta label kode → teks tampilan |
-| `lowConfidenceThreshold` | `0.5` | Batas confidence dianggap rendah |
-| `disclaimer` | *(string panjang)* | Teks peringatan di layar hasil |
+#### `lib/core/failures.dart`
 
----
+Hierarki `sealed class Failure` yang digunakan sebagai representasi error dalam bentuk **data** pada return record `({..., Failure? failure})`:
+- `NetworkFailure(message)` — tidak ada koneksi internet, timeout, atau server tidak dapat dijangkau.
+- `ServerFailure(message, {statusCode})` — server mengembalikan HTTP 4xx/5xx atau format respons tidak valid.
+- `LocalFailure(message)` — operasi penyimpanan SQLite atau file lokal gagal.
+- `ValidationFailure(message)` — validasi input bisnis gagal di domain layer.
 
-#### `lib/core/theme.dart`
+#### `lib/core/format.dart`
 
-File paling penting untuk **sistem desain Neobrutalism** aplikasi. Semua warna, tipografi, shadow, border, dan spacing didefinisikan di sini — tidak ada nilai hardcoded di widget manapun.
-
-**Kelas yang terdapat di dalam file ini:**
-
-##### `AppColors`
-Palet warna lengkap:
-- `primary` — Merah tua (`#B52603`) — warna brand utama
-- `primaryContainer` — Merah terang (`#FF5A36`) — warna tombol & aksen
-- `secondary` — Biru (`#0054CB`)
-- `tertiary` — Teal (`#006879`)
-- `bgCanvas` — Krem (`#FDF6EC`) — background halaman
-- `bgSurface` — Putih (`#FFFFFF`) — background card
-- `statusFresh` — Hijau (`#3DDC84`)
-- `statusHalf` — Kuning (`#FFC93C`)
-- `statusSpoiled` — Merah (`#FF4D4D`)
-- `borderDefault` — Hitam (`#111111`) — border semua elemen
-- `shadowHard` — Hitam (`#111111`) — warna shadow offset
-
-##### `AppShadows`
-Factory untuk shadow bergaya neobrutalism (hard offset, blur = 0):
-- `hard({x, y, color})` — shadow dasar (default 4×4)
-- `hardSmall()` — shadow kecil 2×2 (untuk state *ditekan*)
-- `hardMedium()` — shadow sedang 3×3
-- `hardLarge()` — shadow besar 5×5
-
-##### `AppBorders`
-Ketebalan border standar: `thin` (1.5), `medium` (2.5), `thick` (3.0)
-
-##### `AppRadius`
-Radius sudut: `sm` (4), `md` (8), `lg` (12), `xl` (16), `full` (9999 = pill)
-
-##### `AppSpacing`
-Sistem spasi: `xs` (4), `sm` (8), `md` (16), `lg` (24), `xl` (36), `margin` (16)
-
-##### `AppTextStyles`
-Style teks yang telah dikonfigurasi (font, ukuran, berat, tinggi baris):
-- Headline: `headlineXlMobile` (32px), `headlineLgMobile` (26px), `headlineMd` (24px), `headlineSm` (20px) — font **SpaceGrotesk**
-- Body: `bodyLg` (18px), `bodyMd` (16px), `bodySm` (14px) — font **PlusJakartaSans**
-- Label: `labelLg` (14px), `labelMd` (12px), `labelSm` (10px) — font **SpaceGrotesk**, weight 700–800
-
-##### `buildAppTheme() → ThemeData`
-Fungsi yang merakit semua elemen di atas menjadi `ThemeData` Material3 yang siap dipakai `MaterialApp`.
+Fungsi murni `formatScanTimestamp(DateTime dateTime)` menggunakan `DateFormat('dd MMM, HH:mm')` agar `HistoryScreen` tidak memanggil `DateFormat` langsung di widget dan dapat diuji dengan unit test.
 
 ---
 
-#### `lib/core/errors/app_exceptions.dart`
+### 🌐 Data Layer — API (FastAPI + Dio)
 
-Hierarki exception terstruktur untuk error handling yang konsisten di seluruh aplikasi.
+#### `lib/data/api/api_endpoints.dart`
 
-```
-Exception
-├── AppException (base class, pesan + originalError)
-│   ├── ModelLoadException    — TFLite model gagal dimuat
-│   ├── InferenceException    — Inferensi model gagal
-│   ├── StorageException      — Operasi SQLite gagal
-│   └── ImageProcessingException — Preprocessing gambar gagal
-├── DatabaseException         — Error spesifik sqflite
-└── PermissionDeniedException — Izin kamera/storage ditolak
-```
+Konfigurasi terpusat untuk endpoint backend FastAPI:
+- `baseUrl`: `'https://8000-agq6gs7y3hvdgpfa33qiputqnm.instabox.tech'`
+- `predictNetV2`: `'/predict/netv2'`
+- `predictSvm`: `'/predict/svm'`
+- `timeout`: `Duration(seconds: 30)`
 
-Setiap exception menyimpan `message` (string deskripsi) dan `originalError` (exception asli dari library) untuk debugging.
+#### `lib/data/api/dio_client.dart`
 
----
+Factory `DioClient.create({baseUrl, timeout})` yang menyiapkan instance `Dio` dengan `BaseOptions` (`baseUrl`, `connectTimeout`, `sendTimeout`, `receiveTimeout`, dan header `Accept: application/json`).
 
-#### `lib/core/result_ui_ext.dart`
+#### `lib/data/api/meat_prediction_remote_datasource.dart`
 
-Extension Flutter pada domain entity `ClassificationResult`. 
-
-File ini menjembatani entity domain murni dengan kebutuhan visual presentasi. Menjaga domain tetap 100% murni Dart (tanpa dependensi Flutter), sementara helper presentasi seperti `Color` dan `IconData` tetap mudah diakses oleh widget.
-
-**Extension Getters:**
-- `statusColor` → Mengembalikan `Color` status (`AppColors.statusFresh`, `statusHalf`, atau `statusSpoiled`)
-- `statusIcon` → Mengembalikan `IconData` status (`Icons.check_circle`, `warning`, `block`)
+Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemoteDataSourceImpl`:
+- Mengirim gambar sebagai `multipart/form-data` (field `'file'`) melalui `_dio.post(...)`.
+- Memeriksa keberadaan file lokal sebelum upload (melempar `ImageProcessingException` jika hilang).
+- Memetakan `DioException` (timeout, connection error, HTTP 400/413/422/5xx, bad certificate, `SocketException`) menjadi `NetworkException` atau `InferenceException`.
 
 ---
 
 ### 💾 Data Layer — Database (SQLite)
 
----
-
 #### `lib/data/db/db_helper.dart`
 
-**Singleton** yang mengelola koneksi ke database SQLite `meatfresh.db`.
-
-**Method:**
-
-| Method | Return | Keterangan |
-|--------|--------|-----------|
-| `DbHelper.instance` | `DbHelper` | Singleton instance, hanya ada satu |
-| `get database` | `Future<Database>` | Lazy getter — inisialisasi DB jika belum ada |
-| `_initDb()` | `Future<Database>` | Buka/buat file DB di path sistem |
-| `_onCreate(db, version)` | `Future<void>` | Eksekusi SQL `CREATE TABLE` pertama kali |
-| `close()` | `Future<void>` | Tutup koneksi DB (dipanggil saat dispose app) |
-
-**Schema tabel `classifications`:**
-```sql
-CREATE TABLE classifications (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  image_path  TEXT NOT NULL,
-  meat_type   TEXT,
-  result      TEXT NOT NULL,
-  confidence  REAL NOT NULL,
-  created_at  TEXT NOT NULL
-);
-```
-
----
+**Singleton** yang mengelola koneksi ke database SQLite `meatfresh.db` (versi 2, mendukung migrasi otomatis `onUpgrade` dari v1 ke v2) dan mengeksekusi `CREATE TABLE classifications`.
 
 #### `lib/data/db/classification_dao.dart`
 
-**Data Access Object (DAO)** — satu-satunya kelas yang boleh langsung menyentuh SQL queries untuk tabel `classifications`. Mendukung Dependency Injection dengan menerima parameter opsional `DbHelper` (memudahkan mocking saat unit test).
-
-**Method:**
+**Data Access Object (DAO)** — satu-satunya kelas yang menyentuh query SQL untuk tabel `classifications`. Menerima `DbHelper` opsional melalui constructor untuk kebutuhan testing.
 
 | Method | Return | Keterangan |
 |--------|--------|-----------|
 | `insert(ClassificationModel model)` | `Future<int>` | Simpan model baru ke SQLite, return ID yang di-generate |
-| `getAll()` | `Future<List<ClassificationResult>>` | Ambil semua record, urut terbaru dulu |
-| `getById(id)` | `Future<ClassificationResult?>` | Ambil satu record by ID, null jika tidak ada |
-| `delete(id)` | `Future<int>` | Hapus satu record by ID, return jumlah baris terhapus |
+| `getAll()` | `Future<List<ClassificationModel>>` | Ambil semua record, urut terbaru dulu (`created_at DESC`) |
+| `delete(id)` | `Future<int>` | Hapus satu record by ID |
 | `deleteAll()` | `Future<int>` | Hapus semua record |
-| `count()` | `Future<int>` | Hitung total record |
 
 ---
+
+### 🧩 Data Layer — Models & Errors
+
+#### `lib/data/errors/app_exceptions.dart`
+
+Hierarki exception internal khusus Data Layer (`AppException`, `InferenceException`, `NetworkException`, `ImageProcessingException`). Exception ini hanya hidup di `lib/data/` dan wajib diubah menjadi `Failure` di layer repository.
 
 #### `lib/data/models/classification_model.dart`
 
-**Data Model** yang memperluas (`extends`) domain entity `ClassificationResult`. Bertanggung jawab atas:
-1. **Serialisasi / Deserialisasi SQLite**: `toMap()` dan `ClassificationModel.fromMap(map)`.
-2. **Konversi Entity**: `toEntity()` dan `ClassificationModel.fromEntity(entity)`.
-3. **Display Helpers Flutter**: Menyimpan getter `statusColor` dan `statusIcon` yang membutuhkan `package:flutter`.
+**Data Model** yang memperluas `ClassificationResult` untuk serialisasi SQLite (`toMap()`, `fromMap()`), `fromEntity()`, dan `toEntity()`. Bebas dari import Flutter UI.
 
-Dengan meletakkan serialisasi di file ini, domain layer tetap steril dari urusan database.
+#### `lib/data/models/prediction_response_model.dart`
 
----
-
-### 🤖 Data Layer — Machine Learning
-
----
-
-#### `lib/data/ml/tflite_service.dart`
-
-Service yang bertanggung jawab memuat model TFLite dan menjalankan **inferensi klasifikasi** pada gambar daging.
-
-> ⚠️ **Status saat ini:** Masih menggunakan **hasil mock (acak berbobot)**. Model TFLite nyata belum diintegrasikan.
-
-**Method:**
-
-| Method | Return | Keterangan |
-|--------|--------|-----------|
-| `get isModelLoaded` | `bool` | Cek apakah model sudah dimuat |
-| `loadModel()` | `Future<void>` | Muat model dari assets (saat ini: simulasi delay 500ms) |
-| `classify(imagePath)` | `Future<Map<String, dynamic>>` | Jalankan klasifikasi, return `{result: String, confidence: double}` |
-| `dispose()` | `void` | Bebaskan resource interpreter |
-
-**Distribusi hasil mock:**
-- `fresh` (SEGAR) — 60% peluang
-- `half_fresh` (SETENGAH SEGAR) — 25% peluang
-- `spoiled` (BUSUK) — 15% peluang
-- `confidence` — random antara 0.65 – 0.99
-
-**TODO integrasi TFLite nyata:**
-```dart
-// 1. Tambahkan dependency di pubspec.yaml:
-//    tflite_flutter: ^0.11.0
-
-// 2. Di loadModel():
-_interpreter = await Interpreter.fromAsset('model/meatfresh_model.tflite');
-
-// 3. Di classify():
-final input = await ImagePreprocessor.prepare(imagePath);
-final output = List.filled(1 * 3, 0.0).reshape([1, 3]);
-_interpreter.run(input, output);
-final probs = output[0] as List<double>;
-final maxIdx = probs.indexOf(probs.reduce(max));
-return {'result': labels[maxIdx], 'confidence': probs[maxIdx]};
-```
-
----
-
-#### `lib/data/ml/image_preprocessor.dart`
-
-Kelas utilitas statis untuk mempersiapkan gambar sebelum dianalisis.
-
-**Method:**
-
-| Method | Return | Keterangan |
-|--------|--------|-----------|
-| `copyToAppStorage(sourcePath)` | `Future<String>` | Salin file gambar ke direktori privat app (`Documents/scan_images/scan_<timestamp>.ext`), return path baru |
-
-**Mengapa gambar perlu disalin?**
-File dari kamera bersifat sementara (temp). Menyalinnya ke app storage memastikan gambar tetap tersedia meskipun file temp sudah terhapus.
-
-**TODO preprocessing untuk TFLite:**
-```dart
-// Ketika model nyata siap, tambahkan method prepare():
-static Future<Float32List> prepare(String imagePath) async {
-  // 1. Decode JPEG/PNG ke buffer pixel
-  // 2. Resize ke 224×224 (atau ukuran input model)
-  // 3. Normalisasi: bagi /255.0 (atau pakai mean/std dari training)
-  // 4. Konversi ke Float32List dalam format NHWC [1, H, W, 3]
-}
-```
+Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`). Menormalisasi label `'half-fresh'` → `'half_fresh'`, memetakan string model (`'netv2'`/`'svm'`) lewat `parseModelType(...)`, dan mengonversinya menjadi entity murni via `toEntity()`.
 
 ---
 
 ### 📦 Data Layer — Repository
 
----
-
 #### `lib/data/repositories/classification_repository.dart`
 
-Implementasi konkret **`ClassificationRepositoryImpl`** yang mengimplementasikan interface kontrak `ClassificationRepository` dari domain layer.
+`ClassificationRepositoryImpl` mengimplementasikan `ClassificationRepository` dari domain. Membungkus operasi `ClassificationDao` dalam `try-catch`, mengonversi `ClassificationModel` menjadi entity via `.toEntity()`, dan mengembalikan `LocalFailure` jika terjadi error.
 
-Menerima `ClassificationDao` melalui constructor injection. Menjadi pelindung domain dari raw exception sqflite dengan membungkus semua operasi ke dalam `try-catch` dan melempar `StorageException`.
+#### `lib/data/repositories/remote_meat_classifier_repository.dart`
 
-**Method (mengimplementasikan kontrak domain):**
+`RemoteMeatClassifierRepository` mengimplementasikan `MeatClassifierRepository`. Memetakan `PredictionModelType.netv2` → `ApiEndpoints.predictNetV2` dan `PredictionModelType.svm` → `ApiEndpoints.predictSvm`, lalu menangkap `NetworkException` / `ImageProcessingException` / `AppException` menjadi `ServerFailure`, `NetworkFailure`, atau `LocalFailure`.
 
-| Method | Return | Keterangan |
-|--------|--------|-----------|
-| `save(result)` | `Future<ClassificationResult>` | Konversi entity ke model, simpan via DAO, return entity ber-ID baru |
-| `getAll()` | `Future<List<ClassificationResult>>` | Ambil semua riwayat via DAO |
-| `getById(id)` | `Future<ClassificationResult?>` | Ambil satu hasil by ID |
-| `delete(id)` | `Future<void>` | Hapus satu hasil |
-| `deleteAll()` | `Future<void>` | Hapus semua riwayat |
-| `count()` | `Future<int>` | Hitung total riwayat tersimpan |
+#### `lib/data/repositories/local_image_storage_repository.dart`
 
-Semua method membungkus operasi DAO dalam `try-catch` dan melempar `StorageException` jika terjadi error.
+`LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<timestamp>.ext` dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
 
 ---
 
-### 🏛️ Domain Layer
-
----
+### 🏛️ Domain Layer *(100% Murni Dart)*
 
 #### `lib/domain/models/classification_result.dart`
 
-**Domain Entity murni (Dart murni)** yang merepresentasikan hasil scan/klasifikasi daging. 
+Entity murni yang merepresentasikan satu hasil scan (`id`, `imagePath`, `meatType`, `result`, `confidence`, `createdAt`) beserta helper murni Dart (`displayName`, `statusEmoji`, `isLowConfidence`, `confidencePercent`, `copyWith`).
 
-> 🛡️ **Steril dari Flutter & Database:** Tidak ada import `package:flutter`, tidak ada referensi `Color` atau `IconData`, dan tidak ada method serialisasi `toMap()`/`fromMap()`.
+#### `lib/domain/models/prediction_model_type.dart`
 
-**Field:**
-| Field | Tipe | Keterangan |
-|-------|------|-----------|
-| `id` | `int?` | ID unik dari database (null sebelum disimpan) |
-| `imagePath` | `String` | Path absolut file gambar di storage app |
-| `meatType` | `String?` | Jenis daging (opsional, untuk fitur mendatang) |
-| `result` | `String` | Kode hasil: `'fresh'`, `'half_fresh'`, atau `'spoiled'` |
-| `confidence` | `double` | Tingkat kepercayaan model: 0.0 – 1.0 |
-| `createdAt` | `DateTime` | Waktu scan dilakukan |
+Enum identitas model bisnis `enum PredictionModelType { netv2, svm }` tanpa detail string/URL backend.
 
-**Display helpers (pure Dart getter):**
-| Getter | Return | Contoh |
-|--------|--------|--------|
-| `displayName` | `String` | `"SEGAR"`, `"SETENGAH SEGAR"`, `"BUSUK"` |
-| `statusEmoji` | `String` | `"✅"`, `"⚠️"`, `"⛔"` |
-| `isLowConfidence` | `bool` | `true` jika confidence < 0.5 |
-| `confidencePercent` | `String` | `"94.0%"` |
+#### `lib/domain/models/prediction_output.dart`
 
-**Method:**
-- `copyWith({...})` — buat salinan objek entity dengan field tertentu diubah
+Entity hasil prediksi AI (`label`, `confidence`, `modelType`, `probabilities`, `segmentationFallback`).
 
----
+#### Kontrak Repository (`lib/domain/repositories/`)
+- `classification_repository.dart` — kontrak `save`, `getAll`, `delete`, `deleteAll` berbasis `({..., Failure? failure})`.
+- `meat_classifier_repository.dart` — kontrak `classify({required imagePath, required modelType})`.
+- `image_storage_repository.dart` — kontrak `saveScanImage(sourcePath)`.
 
-#### `lib/domain/repositories/classification_repository.dart`
+#### `lib/domain/usecases/analyze_meat_usecase.dart`
 
-**Kontrak interface repository (Domain Contract).** 
-
-Mendefinisikan *apa* kebutuhan domain tanpa mempedulikan *bagaimana* data tersebut diambil atau disimpan (apakah SQLite, REST API, atau mock data).
-
-```dart
-abstract class ClassificationRepository {
-  Future<ClassificationResult> save(ClassificationResult result);
-  Future<List<ClassificationResult>> getAll();
-  Future<ClassificationResult?> getById(int id);
-  Future<void> delete(int id);
-  Future<void> deleteAll();
-  Future<int> count();
-}
-```
+Use case `AnalyzeMeatUseCase` yang mengorkestrasi 3 kontrak repository secara berurutan:
+1. Validasi path gambar (mengembalikan `ValidationFailure` jika kosong).
+2. Salin gambar ke penyimpanan lokal via `ImageStorageRepository`.
+3. Kirim gambar ke FastAPI sesuai `modelType` via `MeatClassifierRepository`.
+4. Simpan `ClassificationResult` ke SQLite via `ClassificationRepository`.
 
 ---
 
 ### 🖥️ Presentation Layer — Providers (State Management)
 
----
-
 #### `lib/presentation/providers/scan_provider.dart`
 
-Mengelola **seluruh alur scan** dari pemilihan gambar hingga hasil tersimpan. Extends `ChangeNotifier`.
-
-> 💉 **Dependency Injection via Constructor:** Menerima `TfliteService` dan `ClassificationRepository` (interface abstraksi) melalui constructor. Tidak pernah membuat dependency konkret sendiri (`new`).
-
-**Constructor:**
-```dart
-ScanProvider({
-  required TfliteService tfliteService,
-  required ClassificationRepository repository,
-});
-```
-
-**State Machine:**
-```
-idle → imageSelected → processing → success
-                                  → error
-```
-
-**Enum `ScanState`:**
-- `idle` — tidak ada gambar dipilih
-- `imageSelected` — gambar sudah dipilih, belum dianalisis
-- `processing` — sedang menjalankan analisis
-- `success` — analisis berhasil
-- `error` — analisis gagal
-
-**Method:**
-
-| Method | Keterangan |
-|--------|-----------|
-| `selectImage(path)` | Set path gambar, ubah state ke `imageSelected` |
-| `clearSelection()` | Reset gambar, kembali ke `idle` |
-| `analyzeImage()` | Urutan: copy gambar → classify → buat model → simpan ke DB → state `success` atau `error` |
-| `reset()` | Full reset semua state ke `idle` |
-
-**Alur `analyzeImage()`:**
-```
-1. Set state → processing
-2. ImagePreprocessor.copyToAppStorage(path)   ← salin gambar ke app storage
-3. TfliteService.classify(storedPath)         ← jalankan inferensi ML
-4. Buat ClassificationResult dari output
-5. ClassificationRepository.save(result)      ← simpan ke SQLite via abstraksi
-6. Set state → success (atau error jika exception)
-```
-
----
+Mengelola state alur pindai (`idle → imageSelected → processing → success / error`) serta pilihan model aktif (`selectedModel`, default `PredictionModelType.netv2`). Menerima `AnalyzeMeatUseCase` via constructor DI dan membaca `outcome.failure` tanpa `try-catch`.
 
 #### `lib/presentation/providers/history_provider.dart`
 
-Mengelola **state halaman riwayat** termasuk data, filter, dan pencarian. Extends `ChangeNotifier`.
-
-> 💉 **Dependency Injection via Constructor:** Menerima `ClassificationRepository` (interface domain) melalui constructor.
-
-**Constructor:**
-```dart
-HistoryProvider({
-  required ClassificationRepository repository,
-});
-```
-
-**State internal:**
-- `_items` — daftar semua hasil scan dari DB
-- `_isLoading` — indikator loading
-- `_activeFilter` — filter aktif: `'all'`, `'fresh'`, `'half_fresh'`, `'spoiled'`
-- `_searchQuery` — teks pencarian aktif
-- `_errorMessage` — pesan error jika load gagal
-
-**Computed getter:**
-- `filteredItems` — item yang sudah difilter berdasarkan status dan search query
-- `countByResult(result)` — jumlah item per status (untuk chip filter)
-
-**Method:**
-
-| Method | Keterangan |
-|--------|-----------|
-| `loadHistory()` | Ambil semua riwayat dari repository, update `_items` |
-| `deleteItem(id)` | Hapus satu item dari DB dan hapus dari `_items` secara lokal |
-| `deleteAll()` | Hapus semua riwayat dari DB dan kosongkan `_items` |
-| `setFilter(filter)` | Set filter aktif, trigger rebuild UI |
-| `setSearchQuery(query)` | Set query pencarian, trigger rebuild UI |
-| `resetFilters()` | Reset filter ke 'all' dan kosongkan pencarian |
+Mengelola state daftar riwayat (`items`, `filteredItems`, `activeFilter`, `searchQuery`, `isLoading`, `errorMessage`). Menerima `ClassificationRepository` via constructor DI dan memproses `Failure` tanpa `try-catch`.
 
 ---
 
-### 🖥️ Presentation Layer — Screens
+### 🖥️ Presentation Layer — Screens & Theme
+
+- `lib/presentation/shell_screen.dart` — Bottom Navigation Bar 3 tab (**BERANDA**, **PINDAI**, **RIWAYAT**) dengan `IndexedStack`; otomatis memanggil `HistoryProvider.loadHistory()` setiap kali tab **RIWAYAT** dipilih.
+- `lib/presentation/home/home_screen.dart` — Beranda dengan Hero Banner, tombol **MULAI CEK**, aksi cepat, disclaimer, dan rekomendasi penyimpanan.
+- `lib/presentation/capture/capture_screen.dart` — Pengambilan foto dari kamera/galeri, animasi pulse viewfinder, loading overlay `NeoLoading`, serta sinkronisasi `HistoryProvider.loadHistory()` segera setelah `analyzeImage()` sukses.
+- `lib/presentation/preview/preview_screen.dart` — Pratinjau foto sebelum analisis dijalankan.
+- `lib/presentation/result/result_screen.dart` — Menampilkan ID scan, preview foto, kartu verdict, bar confidence, peringatan low confidence, dan catatan keamanan.
+- `lib/presentation/history/history_screen.dart` — Pencarian, filter chip status, daftar riwayat (memakai `formatScanTimestamp`), serta hapus item.
+- `lib/presentation/theme/theme.dart` — Palet `AppColors`, `AppShadows`, `AppBorders`, `AppRadius`, `AppSpacing`, `AppTextStyles`, dan `buildAppTheme()`.
+- `lib/presentation/theme/result_ui_ext.dart` — Extension `ClassificationResultUiExt` (`statusColor`, `statusIcon`) khusus UI Flutter.
 
 ---
 
-#### `lib/presentation/shell_screen.dart`
+### 🎨 Presentation Layer — Widgets
 
-**Wrapper navigasi utama** yang mengelola Bottom Navigation Bar dengan tiga tab.
-
-**Cara kerja:**
-- Menggunakan `IndexedStack` untuk menjaga state setiap tab tetap hidup saat berpindah tab (tidak rebuild dari nol).
-- Tiga tab: **BERANDA** (index 0), **PINDAI** (index 1), **RIWAYAT** (index 2).
-- Meneruskan callback `onNavigateToTab` ke `HomeScreen` agar tombol di beranda bisa berpindah tab secara programatik.
-
-**Widget:**
-- `_buildBottomNav()` — Membangun navigation bar dengan styling neobrutalism.
-- `_buildNavItem(index, icon, label)` — Item navigasi dengan animasi warna aktif (background merah saat aktif).
+Terletak di `lib/presentation/widgets/`:
+- `confidence_bar.dart` — Progress bar segmented neobrutalism.
+- `neo_badge.dart` — Badge pill status (`FRESH`, `HALF-FRESH`, `SPOILED`).
+- `neo_button.dart` — Tombol neobrutalist dengan animasi press-down.
+- `neo_card.dart` — Container card neobrutalist.
+- `neo_loading.dart` — Overlay/inline loading indicator neobrutalism.
 
 ---
 
-#### `lib/presentation/home/home_screen.dart`
+### 🧪 Tests
 
-**Halaman beranda** — halaman pertama yang dilihat pengguna saat membuka aplikasi.
-
-**Komponen yang ditampilkan:**
-1. **Hero Banner** — Card merah besar dengan ikon daging, nama aplikasi, dan tagline.
-2. **Tombol "MULAI CEK"** — Card merah besar dengan animasi press-down, navigasi ke tab Pindai.
-3. **Quick Actions** — Dua tombol kecil: "RIWAYAT" dan "UNGGAH" (dari galeri).
-4. **Safety Disclaimer** — Banner kuning berisi peringatan bahwa aplikasi bukan pengganti inspeksi resmi.
-
-**Widget internal `_PressableCard`:**
-- `StatefulWidget` yang mengimplementasikan animasi press-down neobrutalism.
-- `onTapDown` → translate +2px & shadow mengecil (kesan ditekan).
-- `onTapUp` / `onTapCancel` → kembali ke posisi semula.
-
----
-
-#### `lib/presentation/capture/capture_screen.dart`
-
-**Halaman scan/capture** — tempat pengguna mengambil atau memilih foto daging.
-
-**Fitur:**
-- **Animasi pulse** pada tombol kamera (scale 0.9 → 1.1, loop, `AnimationController` + `SingleTickerProviderStateMixin`).
-- **Tombol Kamera** — `_pickFromCamera()`: buka kamera native via `image_picker`, quality 85%, maxWidth 1920px.
-- **Tombol Galeri** — `_pickFromGallery()`: buka galeri via `image_picker`.
-- Setelah foto dipilih → navigasi `push` ke `PreviewScreen`.
-- Jika kamera/galeri ditolak → tampilkan `SnackBar` pesan error.
-
-**Integrasi dengan Provider:**
-- Listen ke `ScanProvider.scanState`.
-- Jika state berubah ke `processing` → tampilkan `NeoLoading` overlay.
-- Jika state berubah ke `success` → navigasi `push` ke `ResultScreen`.
-
----
-
-#### `lib/presentation/preview/preview_screen.dart`
-
-**Halaman pratinjau foto** — tampil antara capture dan analisis, memberi pengguna kesempatan mengkonfirmasi atau mengganti foto.
-
-**Tampilan:**
-- Foto yang dipilih (~60% ruang layar) dengan `Image.file()`, `BoxFit.cover`.
-- Teks panduan: "Pastikan daging terlihat jelas dan pencahayaan cukup."
-- **Tombol "PILIH FOTO LAIN"** — `Navigator.pop()` kembali ke CaptureScreen.
-- **Tombol "ANALISIS"** — memanggil callback `onAnalyze` (yang diset oleh CaptureScreen untuk memanggil `ScanProvider.analyzeImage()`).
-
-**Widget internal `_PressableButton`:**
-- Animasi press-down neobrutalism, dua varian: primary (merah) dan secondary (putih).
-
----
-
-#### `lib/presentation/result/result_screen.dart`
-
-**Halaman hasil analisis** — menampilkan detail hasil klasifikasi setelah `analyzeImage()` berhasil.
-
-**Komponen:**
-1. **Scan ID Bar** — Timestamp scan dan ID unik.
-2. **Preview Gambar** — Foto daging yang dianalisis.
-3. **Verdict Card** — Card besar dengan warna status, emoji, nama status (`SEGAR/SETENGAH SEGAR/BUSUK`), dan skor confidence.
-4. **Confidence Card** — Progress bar visual dari confidence score.
-5. **Low Confidence Warning** — Banner kuning dengan teks peringatan, hanya muncul jika `confidence < 0.5`.
-6. **Safety Notice** — Disclaimer teks dari `AppConstants.disclaimer`.
-7. **Action Buttons** — Tombol "SCAN LAGI" (reset + navigasi ke Capture) dan "LIHAT RIWAYAT".
-
----
-
-#### `lib/presentation/history/history_screen.dart`
-
-**Halaman riwayat** — daftar semua scan yang tersimpan dengan fitur filter dan pencarian.
-
-**Fitur:**
-- **Auto-load** saat tab pertama kali dibuka (via `initState` → `HistoryProvider.loadHistory()`).
-- **Filter Chips** — tombol SEMUA / SEGAR / SETENGAH SEGAR / BUSUK dengan counter badge.
-- **Search Bar** — kolom pencarian yang memfilter berdasarkan nama status atau jenis daging.
-- **Daftar Riwayat** — `ListView.builder` dengan item berisi: thumbnail gambar, badge status, persentase confidence, waktu scan, dan tombol hapus.
-- **Hapus Semua** — tombol di AppBar untuk menghapus seluruh riwayat (dengan dialog konfirmasi).
-- **Empty State** — tampil saat tidak ada data atau tidak ada yang cocok dengan filter.
-- **Error State** — tampil jika load dari DB gagal.
-
-**Widget internal `_PressableButton`:**
-- Wrapper dengan animasi press-down neobrutalism untuk setiap tombol di dalam layar ini.
-
----
-
-### 🎨 Widgets (Reusable Neobrutalist Components)
-
----
-
-#### `lib/widgets/confidence_bar.dart`
-
-Progress bar horizontal bergaya neobrutalism untuk menampilkan nilai **confidence** model.
-
-- Nilai 0.0–1.0 divisualisasikan sebagai bar horizontal.
-- Warna bar berubah secara dinamis sesuai level kepercayaan.
-- Border tebal dan background kontras sesuai tema neobrutalism.
-
----
-
-#### `lib/widgets/neo_badge.dart`
-
-Badge berbentuk **pill** (sudut bulat penuh) untuk label status kesegaran daging.
-
-**Factory constructors:**
-- `NeoBadge.fresh()` → background hijau, ikon `check_circle`, teks "FRESH"
-- `NeoBadge.halfFresh()` → background kuning, ikon `warning`, teks "HALF-FRESH"
-- `NeoBadge.spoiled()` → background merah, ikon `block`, teks "SPOILED", teks putih
-- `NeoBadge.fromResult(String result)` → dispatch otomatis ke salah satu factory di atas
-
-Semua badge memiliki border hitam dan hard shadow kecil (2×2).
-
----
-
-#### `lib/widgets/neo_button.dart`
-
-Tombol neobrutalist yang dapat dikonfigurasi penuh.
-
-**Parameter:**
-- `child` — konten tombol (biasanya `Row` icon + text)
-- `onPressed` — callback aksi
-- `backgroundColor` — default ke `AppColors.primaryContainer`
-- `borderWidth`, `borderRadius`, `padding`, `width`, `height` — configurable
-
-**Animasi:**
-- `onTapDown` → translate +2px (kesan ditekan), shadow mengecil ke `hardSmall`
-- `onTapUp` / `onTapCancel` → kembali normal
-- Durasi animasi: 100ms
-
----
-
-#### `lib/widgets/neo_card.dart`
-
-Container card neobrutalist yang bisa dipakai di mana saja.
-
-**Parameter:**
-- `child` — konten card
-- `backgroundColor` — default putih
-- `padding` — default 16px semua sisi
-- `borderWidth` — default 2.5px
-- `borderRadius` — default 12px
-- `shadowX`, `shadowY` — offset shadow, default 4×4
-- `onTap` — opsional, membuat card menjadi tappable
-
----
-
-#### `lib/widgets/neo_loading.dart`
-
-Loading indicator bergaya neobrutalism. Bisa dipakai dua cara:
-
-**1. Inline widget:**
-```dart
-NeoLoading(text: 'MEMPROSES...')
-```
-
-**2. Overlay global:**
-```dart
-// Tampilkan di atas semua konten
-NeoLoading.show(context, text: 'MENGANALISIS GAMBAR...');
-
-// Sembunyikan
-NeoLoading.hide();
-```
-
-**Tampilan:**
-- Background semi-transparan (krem 85% opacity) menutupi seluruh layar.
-- Card putih di tengah dengan:
-  - Spinner merah dalam lingkaran merah border hitam
-  - Teks bold uppercase
-  - Teks deskripsi secondary
-
----
-
-### 📁 Assets & Sys
-
----
-
-#### `assets/model/`
-Direktori yang dideklarasikan di `pubspec.yaml` sebagai asset path. Saat ini hanya berisi `.gitkeep` sebagai placeholder. Di sinilah file `meatfresh_model.tflite` akan ditempatkan saat model nyata siap.
-
-#### `sys/`
-Bukan bagian dari source code Flutter. Berisi dokumentasi internal tim:
-- `MeatFresh_AI_PRD_Design_Neobrutalism.md` — Product Requirements Document untuk aspek desain visual.
-- `MeatFresh_AI_PRD_Engineering.md` — Product Requirements Document untuk aspek teknik/engineering.
-- `stitch_pembangun_berbasis_referensi/` — Koleksi referensi UI setiap halaman dalam format HTML + screenshot, digunakan sebagai acuan visual saat development.
+- `test/analyze_meat_usecase_test.dart` — Menguji skenario sukses `netv2`, sukses `svm`, `NetworkFailure`, dan `ValidationFailure` menggunakan fake repository.
+- `test/prediction_response_model_test.dart` — Menguji parsing JSON FastAPI (`/predict/netv2` & `/predict/svm`), normalisasi `'half-fresh'` → `'half_fresh'`, dan `segmentation_fallback`.
+- `test/remote_meat_classifier_repository_test.dart` — Menguji request multipart `Dio` ke `/predict/netv2`, `/predict/svm`, dan pemetaan HTTP 413 menjadi `ServerFailure` menggunakan fake `HttpClientAdapter`.
+- `test/format_test.dart` — Menguji fungsi murni `formatScanTimestamp`.
+- `test/widget_test.dart` — Smoke test rendering `MeatFreshApp` dengan wiring DI.
 
 ---
 
 ## 6. Alur Kerja Aplikasi
 
-```
+```text
 [Buka Aplikasi]
       │
       ▼
@@ -883,41 +428,34 @@ Bukan bagian dari source code Flutter. Berisi dokumentasi internal tim:
       │                                  │ tap ANALISIS
       │                                  ▼
       │                    ScanProvider.analyzeImage()
-      │                    ┌─────────────────────────────┐
-      │                    │ 1. copyToAppStorage()        │
-      │                    │ 2. TfliteService.classify()  │
-      │                    │ 3. Repository.save()         │
-      │                    └──────────────┬──────────────┘
+      │                    → AnalyzeMeatUseCase.call()
+      │                    ┌──────────────────────────────────────┐
+      │                    │ 1. LocalImageStorageRepository       │
+      │                    │ 2. RemoteMeatClassifierRepository    │
+      │                    │    (Dio POST /predict/netv2 | /svm)  │
+      │                    │ 3. ClassificationRepositoryImpl      │
+      │                    │    (Simpan ke SQLite)                │
+      │                    └──────────────┬───────────────────────┘
       │                                   │
       │                         ┌─────────┴──────────┐
       │                         ▼                    ▼
-      │                   [SUCCESS]              [ERROR]
+      │                   [SUCCESS]              [ERROR (Failure)]
       │                       │                    │
       │                       ▼                    ▼
-      │               [ResultScreen]       SnackBar / error state
-      │               ┌─────────────────┐
-      │               │ Foto daging     │
-      │               │ Badge status    │
-      │               │ Confidence bar  │
-      │               │ [SCAN LAGI]     │
-      │               │ [LIHAT RIWAYAT] │
-      │               └────────────┬────┘
-      │                            │
-      ▼                            ▼
-[HistoryScreen] ◄─────────────────┘
-┌─────────────────────────────────┐
-│ Filter chips (SEMUA/SEGAR/...)  │
-│ Search bar                       │
-│ Daftar hasil scan (ListView)     │
-│ Hapus per item / hapus semua     │
-└─────────────────────────────────┘
+      │         HistoryProvider.loadHistory()  SnackBar pesan Failure
+      │                       │
+      │                       ▼
+      │               [ResultScreen]
+      │                       │
+      ▼                       ▼
+[HistoryScreen] ◄─────────────┘ (juga auto-refresh saat tab Riwayat dibuka)
 ```
 
 ---
 
 ## 7. Database Schema
 
-**File:** `meatfresh.db` (SQLite, tersimpan di direktori data app Android)
+**File:** `meatfresh.db` (SQLite lokal)
 
 **Tabel: `classifications`**
 
@@ -928,118 +466,74 @@ Bukan bagian dari source code Flutter. Berisi dokumentasi internal tim:
 | `meat_type` | `TEXT` | — | Jenis daging (nullable, untuk fitur mendatang) |
 | `result` | `TEXT` | `NOT NULL` | Kode hasil: `fresh`, `half_fresh`, `spoiled` |
 | `confidence` | `REAL` | `NOT NULL` | Confidence score: 0.0 – 1.0 |
-| `created_at` | `TEXT` | `NOT NULL` | Timestamp ISO 8601, contoh: `2026-10-12T08:00:00.000` |
+| `created_at` | `TEXT` | `NOT NULL` | Timestamp ISO 8601 |
+| `model_used` | `TEXT` | — | Model AI yang dipakai (`netv2` atau `svm`) |
+| `probabilities_json` | `TEXT` | — | JSON distribusi probabilitas tiap kelas |
+| `segmentation_fallback` | `INTEGER` | — | Flag fallback segmentasi SVM (`0` / `1` / `null`) |
 
 ---
 
 ## 8. Sistem Desain Neobrutalism
 
-Neobrutalism adalah gaya desain yang menggunakan elemen-elemen berikut secara konsisten:
-
 | Elemen | Implementasi di MeatFresh AI |
 |--------|------------------------------|
-| **Border tebal** | Semua card, tombol, badge menggunakan border hitam `#111111` ketebalan 1.5–3.0px |
-| **Hard offset shadow** | Blur = 0, offset solid 2×2 hingga 5×5 pixel, warna hitam — memberi efek 3D datar |
-| **Warna saturasi tinggi** | Merah primer `#B52603`, hijau status `#3DDC84`, kuning `#FFC93C`, biru `#0054CB` |
-| **Tipografi bold** | SpaceGrotesk (headline, label) weight 700–800; PlusJakartaSans (body) weight 500–600 |
-| **Animasi press-down** | Translate +2px saat ditekan + shadow mengecil dari 4×4 ke 2×2 (kesan fisik ditekan) |
-| **Background krem** | Canvas `#FDF6EC` (bukan putih murni) — kontras lebih lembut |
-| **Teks uppercase** | Semua label, tombol, dan badge menggunakan `HURUF BESAR` |
+| **Border tebal** | Border hitam `#111111` ketebalan 1.5–3.5px |
+| **Hard offset shadow** | Blur = 0, offset solid 2×2 hingga 5×5 px berwarna hitam |
+| **Warna saturasi tinggi** | Merah primer `#B52603`, hijau `#3DDC84`, kuning `#FFC93C`, biru `#0054CB` |
+| **Tipografi bold** | SpaceGrotesk (headline/label) & PlusJakartaSans (body) |
+| **Animasi press-down** | Translate +2px saat ditekan + shadow mengecil ke `hardSmall` |
+| **Background krem** | Canvas `#FDF6EC` |
 
 ---
 
-## 9. Refactor Clean Architecture & SOLID
-
-Pada iterasi ini, dilakukan refactoring untuk memenuhi kaidah **Clean Architecture** dan prinsip **SOLID** (terutama *Single Responsibility* dan *Dependency Inversion*) sesuai panduan `CLEAN_ARCHITECTURE.md`.
-
----
+## 9. Refactor Clean Architecture, SOLID & Integrasi API
 
 ### 📊 Perbandingan Sebelum vs Sesudah
 
 | Aspek | ❌ Sebelum Refactor | ✅ Sesudah Refactor |
 |-------|---------------------|---------------------|
-| **Domain Entity** (`classification_result.dart`) | Mengimpor `package:flutter/material.dart`, memiliki method database `toMap()`/`fromMap()`, serta properti visual `statusColor` & `statusIcon`. Melanggar *Single Responsibility* & aturan layer. | **Murni Dart (`pure Dart`)**: Tanpa import Flutter, tanpa mapping database. Hanya memuat data bisnis inti dan helper teks murni. |
-| **Model Data Layer** (`classification_model.dart`) | Belum ada pemisahan antara entity dan model data. Satu kelas mengerjakan semuanya. | Dibuat khusus di `data/models/classification_model.dart` yang meng-extends entity, menangani `toMap()`, `fromMap()`, dan konversi `toEntity()`. |
-| **Kontrak Repository** (`domain/repositories/`) | Tidak ada interface/kontrak di domain layer. Repository langsung berupa kelas konkret di data layer. | Dibuat interface abstrak `ClassificationRepository` di dalam domain layer. Domain mendefinisikan *apa* yang dibutuhkan, bukan *bagaimana*. |
-| **Implementasi Repository** (`data/repositories/`) | `ClassificationRepository` langsung menginstansiasi `ClassificationDao` sendiri (`_dao = ClassificationDao()`). | Diubah menjadi `ClassificationRepositoryImpl` yang mengimplementasikan interface domain dan menerima `ClassificationDao` via constructor injection. |
-| **Dependency Injection di Provider** (`scan_provider.dart`, `history_provider.dart`) | Provider membuat dependency konkret sendiri di field: `final _repo = ClassificationRepository()`, `final _ml = TfliteService()`. Melanggar *Dependency Inversion*. | Seluruh dependensi disuntikkan via constructor (`ScanProvider({required this._tfliteService, required this._repository})`). Provider hanya mengenal interface domain. |
-| **Wiring Dependensi** (`main.dart` & `widget_test.dart`) | Provider dipanggil dengan constructor kosong: `ScanProvider()`, `HistoryProvider()`. | Terpusat di `main.dart` (Composition Root). Semua infrastruktur dirakit sekali lalu di-inject ke provider tree. |
-| **UI Helpers Visual** (`statusColor`, `statusIcon`) | Tercampur di entity domain (`lib/domain/models/`). | Dipindahkan ke `lib/core/result_ui_ext.dart` sebagai extension method pada entity, menjaga domain tetap steril. |
+| **Klasifikasi AI** | Mock acak lokal di `TfliteService` (di-`new` langsung oleh `ScanProvider`). | Terhubung ke FastAPI (`/predict/netv2` & `/predict/svm`) via **`Dio`** di `lib/data/api/`. `TfliteService` dihapus. |
+| **Domain Entity & Model** | `ClassificationResult` mengimpor Flutter (`Color`, `IconData`) serta memiliki `toMap()`/`fromMap()`. | Entity murni Dart di `domain/models/`; mapper SQLite & JSON terpisah di `data/models/` (`ClassificationModel`, `PredictionResponseModel`). |
+| **Error Handling** | Exception dilempar sampai `ScanProvider`/`HistoryProvider` dan ditangani `try-catch`. | Menggunakan `sealed class Failure` + record `({..., Failure? failure})`. Exception hanya internal `lib/data/errors/`. |
+| **Sterilitas `core/` & `presentation/`** | `theme.dart`, `result_ui_ext.dart`, `app_exceptions.dart` ada di `core/`; `DateFormat` dipanggil langsung di `HistoryScreen`. | `core/` 100% murni Dart (`constants`, `failures`, `format`); tema & widgets di `presentation/`; `DateFormat` dipindah ke `core/format.dart`. |
+| **Dependency Injection** | Provider membuat dependency konkret sendiri (`ClassificationRepository()`, `TfliteService()`). | Semua dependensi dirakit di `main.dart` dan disuntikkan via constructor ke `AnalyzeMeatUseCase`, `ScanProvider`, dan `HistoryProvider`. |
+| **Sinkronisasi Riwayat** | Hasil scan baru belum muncul di tab Riwayat sebelum restart aplikasi. | `HistoryProvider.loadHistory()` dipanggil saat scan sukses di `CaptureScreen` dan setiap kali tab Riwayat dipilih di `ShellScreen`. |
 
----
-
-### 🏛️ Penerapan Prinsip SOLID
-
-#### 1. S — Single Responsibility Principle (SRP)
-- **Entity Domain** (`ClassificationResult`): Hanya bertanggung jawab atas struktur data bisnis klasifikasi daging.
-- **Data Model** (`ClassificationModel`): Bertanggung jawab atas serialisasi SQLite dan mapping.
-- **Repository Implementation** (`ClassificationRepositoryImpl`): Bertanggung jawab atas koordinasi penyimpanan data dan translasi exception ke `StorageException`.
-- **UI Extension** (`ClassificationResultUiExt`): Bertanggung jawab atas adaptasi visual (Color/Icon) khusus UI Flutter.
-
-#### 2. O — Open/Closed Principle (OCP)
-- Kontrak `ClassificationRepository` terbuka untuk ekstensi (misalnya menambah `RemoteClassificationRepository` untuk cloud sync) tanpa perlu mengubah domain use case maupun presentation layer.
-
-#### 3. L — Liskov Substitution Principle (LSP)
-- `ClassificationModel` adalah turunan sah dari `ClassificationResult`. Kapan pun domain membutuhkan entity, model dapat disubstitusikan atau dikonversi dengan `toEntity()` tanpa efek samping.
-
-#### 4. I — Interface Segregation Principle (ISP)
-- Repository domain hanya memuat method-method yang benar-benar dibutuhkan oleh use case/provider (`save`, `getAll`, `getById`, `delete`, `deleteAll`, `count`).
-
-#### 5. D — Dependency Inversion Principle (DIP)
-- **High-level module** (`ScanProvider`, `HistoryProvider`) **tidak bergantung pada low-level module** (`ClassificationRepositoryImpl`, `ClassificationDao`, `sqflite`). Keduanya bergantung pada abstraksi (`ClassificationRepository` interface).
-- Wiring konkret hanya terjadi di satu titik masuk (`main.dart`).
-
----
-
-### 🔍 Bukti Verifikasi Sterilitas & Kualitas Kode
-
-Sesuai aturan Clean Architecture, layer domain dan presentation diverifikasi sterilitasnya:
-
-1. **Domain Steril (Dart Murni):**
-   - File `lib/domain/models/classification_result.dart` dan `lib/domain/repositories/classification_repository.dart` **bebas dari** `import 'package:flutter'`, `sqflite`, atau package platform lainnya.
-2. **Presentation Bebas Query Langsung:**
-   - Tidak ada pemanggilan raw database atau inisialisasi repository langsung di dalam folder presentation/pages/widgets.
-3. **Flutter Analyzer:**
-   - Menjalankan `flutter analyze`: **`No issues found!`** (0 error, 0 warning, 0 info).
+### 🔍 Bukti Verifikasi
+- **Grep sterilitas layer (Presentation, Widgets, Domain, Core, Data)**: **0 pelanggaran** arah dependensi.
+- **`flutter analyze`**: **`No issues found!`**.
+- **`flutter test`**: **`All tests passed!`** (11/11 test unit & widget lulus).
 
 ---
 
 ## 10. Status Pengembangan & TODO
 
 ### ✅ Sudah Selesai
-- [x] Struktur proyek Clean Architecture berbasis First-Layer
-- [x] Pemisahan Domain Entity murni & Data Model dengan SQLite serialization
-- [x] Interface abstraksi repository di domain & implementasi konkret di data layer
-- [x] Penerapan Dependency Injection (DI) terpusat pada Provider & main.dart
-- [x] Sistem desain Neobrutalism lengkap (theme, komponen, visual extensions)
-- [x] Alur navigasi (Shell + 3 tab)
-- [x] Integrasi kamera & galeri (`image_picker`)
-- [x] Database SQLite (schema, DAO, repository)
-- [x] State management (`ScanProvider`, `HistoryProvider`)
-- [x] Semua 5 layar UI (Home, Capture, Preview, Result, History)
-- [x] Filter & search di halaman riwayat
-- [x] Reusable widget library (NeoCard, NeoButton, NeoBadge, NeoLoading, ConfidenceBar)
-- [x] Error handling terstruktur (custom exceptions)
-- [x] Verifikasi `flutter analyze` bersih (No issues found)
+- [x] Refactor Clean Architecture (Domain, Data, Presentation, Core) & prinsip SOLID
+- [x] Integrasi endpoint FastAPI `/predict/netv2` dan `/predict/svm` menggunakan `dio` di `lib/data/api/`
+- [x] Error handling berbasis `Failure` + record (`NetworkFailure`, `ServerFailure`, `LocalFailure`, `ValidationFailure`)
+- [x] Use case bisnis `AnalyzeMeatUseCase` & injeksi dependensi terpusat di `main.dart`
+- [x] Database SQLite lokal (`meatfresh.db`) & sinkronisasi otomatis daftar riwayat setelah scan
+- [x] Sistem desain Neobrutalism & seluruh 5 layar UI (Home, Capture, Preview, Result, History)
+- [x] **UI pemilih model (`netv2` vs `svm`)** — pilihan model di `PreviewScreen` terhubung ke `ScanProvider.selectModel(...)`
+- [x] **Tampilan detail probabilitas & info SVM fallback** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v2) dan ditampilkan di `ResultScreen` serta `HistoryScreen`
+- [x] Unit tests (use case, repository Dio dengan mock adapter, response model, classification model, formatter) & widget test (13/13 lulus)
+- [x] Verifikasi `flutter analyze` bersih (`No issues found!`)
 
 ### 🚧 Masih TODO
-
-#### Prioritas Tinggi
-- [ ] **Integrasi model TFLite nyata** — tambah `tflite_flutter` di pubspec, letakkan `meatfresh_model.tflite` di `assets/model/`, implementasi `ImagePreprocessor.prepare()` dan ganti mock di `TfliteService.classify()`
-- [ ] **Preprocessing gambar** — resize 224×224, normalisasi pixel sesuai pipeline training model
 
 #### Prioritas Sedang
 - [ ] **Izin kamera/storage eksplisit** — integrasi `permission_handler` di `CaptureScreen` sebelum memanggil `image_picker`
 - [ ] **Kolom `meat_type`** — UI untuk input jenis daging (ayam, sapi, kambing, dll.)
+- [ ] **Navigasi detail dari riwayat & fitur hapus semua** — lengkapi `onTap` item di `HistoryScreen` dan tombol `deleteAll()`
 - [ ] **Export riwayat** — fitur ekspor ke CSV atau PDF
 
 #### Prioritas Rendah
-- [ ] **Unit tests use case & repository mock** — pengujian repository dengan fake/mock tanpa database asli
-- [ ] **Widget tests** — test interaksi untuk semua layar utama
+- [ ] **Widget tests lanjutan** — test interaksi layar Capture, Preview, Result, dan History
 - [ ] **Onboarding screen** — panduan penggunaan pertama kali
 - [ ] **Pengaturan** — dark mode toggle, bahasa, ukuran font
 
 ---
 
-*Dokumentasi ini dibuat otomatis berdasarkan analisis source code proyek MeatFresh AI.*
-*Versi: 1.1.0 (Clean Architecture & SOLID Edition) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*
+*Dokumentasi ini diperbarui berdasarkan analisis source code proyek MeatFresh AI (`MobileApps/`).*
+*Versi: 1.2.0 (FastAPI Dio + Clean Architecture & Failure Pattern) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*

@@ -56,6 +56,9 @@ class AnalyzeMeatUseCase {
       result: output.label,
       confidence: output.confidence,
       createdAt: DateTime.now(),
+      modelType: output.modelType,
+      probabilities: output.probabilities,
+      segmentationFallback: output.segmentationFallback,
     );
 
     return _classificationRepository.save(result);

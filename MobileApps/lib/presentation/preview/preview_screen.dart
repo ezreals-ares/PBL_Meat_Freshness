@@ -1,5 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../domain/models/prediction_model_type.dart';
+import '../providers/scan_provider.dart';
+import '../theme/result_ui_ext.dart';
 import '../theme/theme.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -19,6 +23,8 @@ class PreviewScreen extends StatefulWidget {
 class _PreviewScreenState extends State<PreviewScreen> {
   @override
   Widget build(BuildContext context) {
+    final scanProvider = context.watch<ScanProvider>();
+
     return Scaffold(
       backgroundColor: AppColors.bgCanvas,
       body: SafeArea(
@@ -31,9 +37,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Tampilan gambar — ~60% ruang yang tersedia
+                    // Tampilan gambar — ruang fleksibel agar pas di berbagai ukuran layar
                     Expanded(
-                      flex: 6,
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.bgSurface,
@@ -63,13 +68,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     // Keterangan panduan
                     Text(
                       'Pastikan daging terlihat jelas dan pencahayaan cukup.',
-                      style: AppTextStyles.bodyMd.copyWith(
+                      style: AppTextStyles.bodySm.copyWith(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const Spacer(),
+                    const SizedBox(height: AppSpacing.md),
+                    // Pemilih model AI (NetV2 vs SVM)
+                    _buildModelSelector(scanProvider),
+                    const SizedBox(height: AppSpacing.md),
                     // Tombol aksi
                     _PressableButton(
                       text: 'PILIH FOTO LAIN',
@@ -79,12 +87,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     _PressableButton(
-                      text: 'ANALISIS',
+                      text:
+                          'ANALISIS (${scanProvider.selectedModel.shortName})',
                       icon: Icons.science,
                       isPrimary: true,
                       onPressed: widget.onAnalyze,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.xs),
                   ],
                 ),
               ),
@@ -92,6 +101,42 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildModelSelector(ScanProvider scanProvider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PILIH MODEL AI',
+          style: AppTextStyles.labelSm.copyWith(
+            color: AppColors.textSecondary,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          children: PredictionModelType.values.map((model) {
+            final isSelected = scanProvider.selectedModel == model;
+            final isLast = model == PredictionModelType.values.last;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: isLast ? 0 : AppSpacing.sm),
+                child: _ModelOptionCard(
+                  title: model.displayName,
+                  subtitle: model.description,
+                  icon: model == PredictionModelType.netv2
+                      ? Icons.hub
+                      : Icons.tune,
+                  isSelected: isSelected,
+                  onTap: () => scanProvider.selectModel(model),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -128,6 +173,95 @@ class _PreviewScreenState extends State<PreviewScreen> {
           Text('PRATINJAU FOTO', style: AppTextStyles.headlineSm),
           const Spacer(),
         ],
+      ),
+    );
+  }
+}
+
+// ─── MODEL OPTION CARD ──────────────────────────────────────
+class _ModelOptionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModelOptionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        transform: Matrix4.translationValues(
+          isSelected ? 1.0 : 0.0,
+          isSelected ? 1.0 : 0.0,
+          0.0,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.secondaryFixed : AppColors.bgSurface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: AppColors.borderDefault,
+            width: isSelected ? 3.0 : 2.0,
+          ),
+          boxShadow: [
+            isSelected ? AppShadows.hardSmall() : AppShadows.hardMedium(),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.secondary
+                    : AppColors.surfaceContainer,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(color: AppColors.borderDefault, width: 1.5),
+              ),
+              child: Icon(
+                icon,
+                size: 16,
+                color: isSelected ? AppColors.onSecondary : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.labelMd.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

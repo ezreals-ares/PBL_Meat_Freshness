@@ -7,6 +7,7 @@ import '../theme/result_ui_ext.dart';
 import '../../domain/models/classification_result.dart';
 import '../widgets/neo_badge.dart';
 import '../providers/history_provider.dart';
+import '../result/result_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -256,7 +257,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return GestureDetector(
       onTap: () {
-        // TODO: Navigasi ke tampilan detail
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ResultScreen(result: item),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -343,6 +349,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           style: AppTextStyles.labelSm.copyWith(
                               color: AppColors.textSecondary,
                               letterSpacing: 1)),
+                      if (item.modelShortName.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryFixed,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: AppColors.borderDefault, width: 1),
+                          ),
+                          child: Text(
+                            item.modelShortName,
+                            style: AppTextStyles.labelSm
+                                .copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
