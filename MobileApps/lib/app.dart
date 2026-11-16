@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'core/theme.dart';
+import 'presentation/theme/theme.dart';
 import 'presentation/shell_screen.dart';
 
 class MeatFreshApp extends StatelessWidget {

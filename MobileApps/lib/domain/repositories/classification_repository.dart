@@ -1,26 +1,22 @@
+import '../../core/failures.dart';
 import '../models/classification_result.dart';
 
-/// Kontrak repository untuk operasi klasifikasi daging.
+/// Kontrak repository riwayat klasifikasi.
 ///
 /// Domain mendefinisikan APA yang dibutuhkan — data layer yang
-/// mengimplementasikan BAGAIMANA. Interface ini tinggal di domain sehingga
-/// arah dependensi selalu mengarah ke dalam (Dependency Inversion Principle).
+/// mengimplementasikan BAGAIMANA. Error dikembalikan sebagai [Failure]
+/// di dalam record, tidak pernah dilempar sebagai exception.
 abstract class ClassificationRepository {
-  /// Simpan hasil klasifikasi. Mengembalikan hasil dengan ID yang digenerate.
-  Future<ClassificationResult> save(ClassificationResult result);
+  /// Simpan hasil klasifikasi. Berhasil → `result` berisi data dengan ID baru.
+  Future<({ClassificationResult? result, Failure? failure})> save(
+      ClassificationResult result);
 
-  /// Ambil semua riwayat klasifikasi, terbaru lebih dulu.
-  Future<List<ClassificationResult>> getAll();
+  /// Ambil semua riwayat, terbaru lebih dulu.
+  Future<({List<ClassificationResult> results, Failure? failure})> getAll();
 
-  /// Ambil satu hasil by ID, null jika tidak ada.
-  Future<ClassificationResult?> getById(int id);
+  /// Hapus satu hasil by ID. Mengembalikan `null` jika berhasil.
+  Future<Failure?> delete(int id);
 
-  /// Hapus satu hasil by ID.
-  Future<void> delete(int id);
-
-  /// Hapus semua riwayat.
-  Future<void> deleteAll();
-
-  /// Hitung total riwayat tersimpan.
-  Future<int> count();
+  /// Hapus semua riwayat. Mengembalikan `null` jika berhasil.
+  Future<Failure?> deleteAll();
 }

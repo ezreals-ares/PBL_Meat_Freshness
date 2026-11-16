@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network permission for FastAPI inference endpoints -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Storage permissions for gallery access (Android < 13) -->

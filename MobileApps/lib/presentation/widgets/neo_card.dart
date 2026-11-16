@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../theme/theme.dart';
 
 /// Reusable Neobrutalist card with hard offset shadow and thick border.
 class NeoCard extends StatelessWidget {

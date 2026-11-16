@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../core/theme.dart';
+import '../theme/theme.dart';
 
 /// Segmented confidence bar matching the neobrutalist reference design.
 class ConfidenceBar extends StatelessWidget {

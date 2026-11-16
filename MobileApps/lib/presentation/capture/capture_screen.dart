@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme.dart';
+import '../theme/theme.dart';
 import '../providers/scan_provider.dart';
 import '../preview/preview_screen.dart';
 import '../result/result_screen.dart';
-import '../../widgets/neo_loading.dart';
+import '../widgets/neo_loading.dart';
 
 class CaptureScreen extends StatefulWidget {
   const CaptureScreen({super.key});

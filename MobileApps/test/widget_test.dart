@@ -1,34 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meatfresh_ai/app.dart';
-import 'package:provider/provider.dart';
+import 'package:meatfresh_ai/data/api/dio_client.dart';
+import 'package:meatfresh_ai/data/api/meat_prediction_remote_datasource.dart';
 import 'package:meatfresh_ai/data/db/classification_dao.dart';
-import 'package:meatfresh_ai/data/ml/tflite_service.dart';
 import 'package:meatfresh_ai/data/repositories/classification_repository.dart';
-import 'package:meatfresh_ai/presentation/providers/scan_provider.dart';
+import 'package:meatfresh_ai/data/repositories/local_image_storage_repository.dart';
+import 'package:meatfresh_ai/data/repositories/remote_meat_classifier_repository.dart';
+import 'package:meatfresh_ai/domain/usecases/analyze_meat_usecase.dart';
 import 'package:meatfresh_ai/presentation/providers/history_provider.dart';
+import 'package:meatfresh_ai/presentation/providers/scan_provider.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   testWidgets('App renders without crash', (WidgetTester tester) async {
-    // Rakit dependensi konkret (sama seperti main.dart) untuk test.
-    // Untuk unit test yang terisolasi, gunakan repository palsu (mock).
+    final dio = DioClient.create();
+    final remoteDataSource = MeatPredictionRemoteDataSourceImpl(dio: dio);
+    final classifierRepository = RemoteMeatClassifierRepository(
+      remoteDataSource: remoteDataSource,
+    );
+    const imageStorageRepository = LocalImageStorageRepository();
     final dao = ClassificationDao();
-    final repository = ClassificationRepositoryImpl(dao: dao);
-    final tfliteService = TfliteService();
+    final classificationRepository = ClassificationRepositoryImpl(dao: dao);
+
+    final analyzeMeatUseCase = AnalyzeMeatUseCase(
+      imageStorageRepository: imageStorageRepository,
+      classifierRepository: classifierRepository,
+      classificationRepository: classificationRepository,
+    );
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(
-            create: (_) => ScanProvider(
-              tfliteService: tfliteService,
-              repository: repository,
-            ),
+            create: (_) => ScanProvider(analyzeMeatUseCase: analyzeMeatUseCase),
           ),
           ChangeNotifierProvider(
-            create: (_) => HistoryProvider(
-              repository: repository,
-            ),
+            create: (_) => HistoryProvider(repository: classificationRepository),
           ),
         ],
         child: const MeatFreshApp(),

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
-import '../domain/models/classification_result.dart';
+import '../../domain/models/classification_result.dart';
 
-/// Extension Flutter untuk [ClassificationResult] agar domain tetap murni Dart.
+/// Extension Flutter untuk [ClassificationResult] agar domain dan core tetap murni Dart.
 ///
 /// Getter [statusColor] dan [statusIcon] membutuhkan `package:flutter` sehingga
-/// tidak boleh ada di domain entity. Extension ini menempatkannya di core layer
-/// (presentation-side) tanpa mencemari domain.
+/// ditempatkan di presentation layer.
 extension ClassificationResultUiExt on ClassificationResult {
   /// Warna status sesuai hasil klasifikasi.
   Color get statusColor {

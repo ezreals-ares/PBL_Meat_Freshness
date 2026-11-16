@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../core/theme.dart';
+import 'theme/theme.dart';
 import 'home/home_screen.dart';
 import 'capture/capture_screen.dart';
 import 'history/history_screen.dart';

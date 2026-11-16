@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../core/theme.dart';
+import '../theme/theme.dart';
 
 class PreviewScreen extends StatefulWidget {
   final String imagePath;

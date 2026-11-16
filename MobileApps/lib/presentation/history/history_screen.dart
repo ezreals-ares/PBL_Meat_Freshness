@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-import '../../core/theme.dart';
-import '../../core/result_ui_ext.dart';
+import '../../core/format.dart';
+import '../theme/theme.dart';
+import '../theme/result_ui_ext.dart';
 import '../../domain/models/classification_result.dart';
-import '../../widgets/neo_badge.dart';
+import '../widgets/neo_badge.dart';
 import '../providers/history_provider.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -251,7 +251,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // ─── HISTORY CARD ─────────────────────────────────────────
   Widget _buildHistoryCard(BuildContext context, ClassificationResult item) {
-    final timeStr = DateFormat('dd MMM, HH:mm').format(item.createdAt);
+    final timeStr = formatScanTimestamp(item.createdAt);
     final statusColor = item.statusColor;
 
     return GestureDetector(

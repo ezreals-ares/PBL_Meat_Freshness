@@ -5,7 +5,7 @@ import '../../domain/repositories/classification_repository.dart';
 /// Provider managing the history screen state.
 ///
 /// Semua dependensi disuntikkan via constructor (Dependency Inversion Principle).
-/// Provider tidak pernah membuat dependency sendiri.
+/// Menerima error sebagai `Failure` dari repository, tanpa try-catch di UI layer.
 class HistoryProvider extends ChangeNotifier {
   final ClassificationRepository _repository;
 
@@ -50,10 +50,11 @@ class HistoryProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      _items = await _repository.getAll();
-    } catch (e) {
-      _errorMessage = 'Failed to load history.';
+    final outcome = await _repository.getAll();
+    if (outcome.failure != null) {
+      _errorMessage = outcome.failure!.message;
+    } else {
+      _items = outcome.results;
     }
 
     _isLoading = false;
@@ -62,26 +63,24 @@ class HistoryProvider extends ChangeNotifier {
 
   /// Delete a single item by id.
   Future<void> deleteItem(int id) async {
-    try {
-      await _repository.delete(id);
+    final failure = await _repository.delete(id);
+    if (failure != null) {
+      _errorMessage = failure.message;
+    } else {
       _items.removeWhere((i) => i.id == id);
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to delete record.';
-      notifyListeners();
     }
+    notifyListeners();
   }
 
   /// Delete all history.
   Future<void> deleteAll() async {
-    try {
-      await _repository.deleteAll();
+    final failure = await _repository.deleteAll();
+    if (failure != null) {
+      _errorMessage = failure.message;
+    } else {
       _items = [];
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to clear history.';
-      notifyListeners();
     }
+    notifyListeners();
   }
 
   /// Set the active filter.
