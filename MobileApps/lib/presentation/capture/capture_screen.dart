@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../theme/theme.dart';
+import '../providers/history_provider.dart';
 import '../providers/scan_provider.dart';
 import '../preview/preview_screen.dart';
 import '../result/result_screen.dart';
@@ -114,6 +115,8 @@ class _CaptureScreenState extends State<CaptureScreen>
 
     if (scanProvider.scanState == ScanState.success &&
         scanProvider.currentResult != null) {
+      // Langsung segarkan HistoryProvider segera setelah hasil scan tersimpan
+      context.read<HistoryProvider>().loadHistory();
       // Ganti preview dengan hasil
       nav.pushReplacement(
         MaterialPageRoute(
