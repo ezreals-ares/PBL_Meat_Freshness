@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../theme/result_ui_ext.dart';
 import '../theme/theme.dart';
 import '../providers/history_provider.dart';
 import '../providers/scan_provider.dart';
@@ -99,8 +100,11 @@ class _CaptureScreenState extends State<CaptureScreen>
   Future<void> _startAnalysis(BuildContext ctx) async {
     final scanProvider = ctx.read<ScanProvider>();
 
-    // Tampilkan loading overlay
-    NeoLoading.show(ctx);
+    // Tampilkan loading overlay sesuai model yang dipilih
+    NeoLoading.show(
+      ctx,
+      text: 'MENGANALISIS (${scanProvider.selectedModel.shortName})...',
+    );
 
     await scanProvider.analyzeImage();
 

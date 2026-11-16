@@ -34,6 +34,15 @@ class ResultScreen extends StatelessWidget {
                     _buildVerdictCard(),
                     const SizedBox(height: AppSpacing.md),
                     _buildConfidenceCard(),
+                    if (result.probabilities != null &&
+                        result.probabilities!.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _buildProbabilitiesCard(),
+                    ],
+                    if (result.segmentationFallback == true) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _buildSegmentationFallbackNotice(),
+                    ],
                     if (result.isLowConfidence) ...[
                       const SizedBox(height: AppSpacing.md),
                       _buildLowConfidenceWarning(),
@@ -133,9 +142,19 @@ class ResultScreen extends StatelessWidget {
             ],
           ),
         ),
-        Text('BARU SAJA',
-            style: AppTextStyles.labelMd
-                .copyWith(color: AppColors.textSecondary)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.secondaryFixed,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(color: AppColors.borderDefault, width: 2),
+            boxShadow: [AppShadows.hardSmall()],
+          ),
+          child: Text(
+            'MODEL: ${result.modelDisplayName}',
+            style: AppTextStyles.labelSm.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
       ],
     );
   }
@@ -398,6 +417,113 @@ class ResultScreen extends StatelessWidget {
                   style: AppTextStyles.labelSm
                       .copyWith(color: AppColors.textSecondary)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── PROBABILITIES BREAKDOWN ──────────────────────────────
+  Widget _buildProbabilitiesCard() {
+    final probs = result.probabilities!;
+    const orderedKeys = ['fresh', 'half_fresh', 'spoiled'];
+    final entries = <MapEntry<String, double>>[
+      for (final key in orderedKeys)
+        if (probs.containsKey(key)) MapEntry(key, probs[key]!),
+      for (final entry in probs.entries)
+        if (!orderedKeys.contains(entry.key)) entry,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.borderDefault, width: 2.5),
+        boxShadow: [AppShadows.hard()],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'DISTRIBUSI PROBABILITAS',
+            style: AppTextStyles.labelMd.copyWith(letterSpacing: 1),
+          ),
+          const SizedBox(height: 12),
+          ...entries.map((entry) {
+            final label =
+                AppConstants.labelDisplayNames[entry.key] ??
+                entry.key.toUpperCase();
+            final pct = (entry.value * 100).clamp(0.0, 100.0);
+            final barColor = switch (entry.key) {
+              'fresh' => AppColors.statusFresh,
+              'half_fresh' => AppColors.statusHalf,
+              'spoiled' => AppColors.statusSpoiled,
+              _ => AppColors.surfaceContainer,
+            };
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(label, style: AppTextStyles.labelSm),
+                      Text(
+                        '${pct.toStringAsFixed(1)}%',
+                        style: AppTextStyles.labelSm
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainer,
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(
+                          color: AppColors.borderDefault, width: 1.5),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: (entry.value).clamp(0.0, 1.0),
+                      child: Container(color: barColor),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ─── SEGMENTATION FALLBACK NOTICE ─────────────────────────
+  Widget _buildSegmentationFallbackNotice() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.secondaryFixed,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.borderDefault, width: 2),
+        boxShadow: [AppShadows.hardSmall()],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline,
+              color: AppColors.textPrimary, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'INFO SVM — Area daging sulit dipisahkan dari latar, analisis dilakukan pada seluruh frame gambar.',
+              style: AppTextStyles.labelMd
+                  .copyWith(fontWeight: FontWeight.w700, height: 1.4),
+            ),
           ),
         ],
       ),
