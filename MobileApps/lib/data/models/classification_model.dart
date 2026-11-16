@@ -1,12 +1,9 @@
-import 'package:flutter/material.dart';
-import '../../core/theme.dart';
 import '../../domain/models/classification_result.dart';
 
-/// Data model yang memperluas [ClassificationResult] dengan:
-/// - Serialisasi SQLite (`toMap` / `fromMap`) — urusan data layer
-/// - Display helpers Flutter (`statusColor`, `statusIcon`) — membutuhkan package:flutter
+/// Data model yang memperluas [ClassificationResult] dengan serialisasi SQLite
+/// (`toMap` / `fromMap`) dan konversi ke entity murni (`toEntity`).
 ///
-/// Domain entity [ClassificationResult] tetap murni Dart tanpa import Flutter.
+/// Hanya bertugas sebagai mapper data eksternal — bebas dari import Flutter UI.
 class ClassificationModel extends ClassificationResult {
   const ClassificationModel({
     super.id,
@@ -16,36 +13,6 @@ class ClassificationModel extends ClassificationResult {
     required super.confidence,
     required super.createdAt,
   });
-
-  // ─── Flutter display helpers ──────────────────────────────
-
-  /// Warna status sesuai hasil klasifikasi.
-  Color get statusColor {
-    switch (result) {
-      case 'fresh':
-        return AppColors.statusFresh;
-      case 'half_fresh':
-        return AppColors.statusHalf;
-      case 'spoiled':
-        return AppColors.statusSpoiled;
-      default:
-        return AppColors.surfaceContainer;
-    }
-  }
-
-  /// Ikon status sesuai hasil klasifikasi.
-  IconData get statusIcon {
-    switch (result) {
-      case 'fresh':
-        return Icons.check_circle;
-      case 'half_fresh':
-        return Icons.warning;
-      case 'spoiled':
-        return Icons.block;
-      default:
-        return Icons.help;
-    }
-  }
 
   // ─── SQLite serialization ─────────────────────────────────
 

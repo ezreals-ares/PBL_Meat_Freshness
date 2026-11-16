@@ -1,4 +1,4 @@
-import '../../core/errors/app_exceptions.dart';
+import '../../core/failures.dart';
 import '../../domain/models/classification_result.dart';
 import '../../domain/repositories/classification_repository.dart';
 import '../db/classification_dao.dart';
@@ -6,8 +6,8 @@ import '../models/classification_model.dart';
 
 /// Implementasi konkret [ClassificationRepository] menggunakan SQLite (sqflite).
 ///
-/// Semua exception dari DAO dikonversi ke [StorageException] sebelum
-/// sampai ke domain/presentation — UI tidak pernah menerima error mentah.
+/// Semua exception dari DAO ditangkap di sini dan dikembalikan sebagai
+/// [LocalFailure] — UI tidak pernah menerima error mentah.
 class ClassificationRepositoryImpl implements ClassificationRepository {
   final ClassificationDao _dao;
 
@@ -16,58 +16,51 @@ class ClassificationRepositoryImpl implements ClassificationRepository {
   ClassificationRepositoryImpl({required this._dao});
 
   @override
-  Future<ClassificationResult> save(ClassificationResult result) async {
+  Future<({ClassificationResult? result, Failure? failure})> save(
+      ClassificationResult result) async {
     try {
       final model = ClassificationModel.fromEntity(result);
       final id = await _dao.insert(model);
-      return model.copyWith(id: id);
+      return (result: model.copyWith(id: id).toEntity(), failure: null);
     } catch (e) {
-      throw StorageException('Failed to save classification result.', e);
+      return (
+        result: null,
+        failure: const LocalFailure('Gagal menyimpan hasil klasifikasi.'),
+      );
     }
   }
 
   @override
-  Future<List<ClassificationResult>> getAll() async {
+  Future<({List<ClassificationResult> results, Failure? failure})>
+      getAll() async {
     try {
-      return await _dao.getAll();
+      final models = await _dao.getAll();
+      return (results: models.map((m) => m.toEntity()).toList(), failure: null);
     } catch (e) {
-      throw StorageException('Failed to load classification history.', e);
+      return (
+        results: const <ClassificationResult>[],
+        failure: const LocalFailure('Gagal memuat riwayat klasifikasi.'),
+      );
     }
   }
 
   @override
-  Future<ClassificationResult?> getById(int id) async {
-    try {
-      return await _dao.getById(id);
-    } catch (e) {
-      throw StorageException('Failed to load classification result.', e);
-    }
-  }
-
-  @override
-  Future<void> delete(int id) async {
+  Future<Failure?> delete(int id) async {
     try {
       await _dao.delete(id);
+      return null;
     } catch (e) {
-      throw StorageException('Failed to delete classification result.', e);
+      return const LocalFailure('Gagal menghapus hasil klasifikasi.');
     }
   }
 
   @override
-  Future<void> deleteAll() async {
+  Future<Failure?> deleteAll() async {
     try {
       await _dao.deleteAll();
+      return null;
     } catch (e) {
-      throw StorageException('Failed to clear classification history.', e);
-    }
-  }
-
-  @override
-  Future<int> count() async {
-    try {
-      return await _dao.count();
-    } catch (e) {
-      throw StorageException('Failed to count classification results.', e);
+      return const LocalFailure('Gagal menghapus seluruh riwayat.');
     }
   }
 }
