@@ -14,7 +14,7 @@ import 'package:provider/provider.dart';
 
 void main() {
   testWidgets('App renders without crash', (WidgetTester tester) async {
-    final dio = DioClient.create();
+    final dio = DioClient.create(baseUrl: 'https://example.test');
     final remoteDataSource = MeatPredictionRemoteDataSourceImpl(dio: dio);
     final classifierRepository = RemoteMeatClassifierRepository(
       remoteDataSource: remoteDataSource,

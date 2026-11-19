@@ -27,6 +27,7 @@
 8. [Sistem Desain Neobrutalism](#8-sistem-desain-neobrutalism)
 9. [Refactor Clean Architecture, SOLID & Integrasi API](#9-refactor-clean-architecture-solid--integrasi-api)
 10. [Status Pengembangan & TODO](#10-status-pengembangan--todo)
+11. [Audit Kelayakan Produksi & Rencana Perbaikan](#11-audit-kelayakan-produksi--rencana-perbaikan)
 
 ---
 
@@ -258,22 +259,23 @@ Fungsi murni `formatScanTimestamp(DateTime dateTime)` menggunakan `DateFormat('d
 
 #### `lib/data/api/api_endpoints.dart`
 
-Konfigurasi terpusat untuk endpoint backend FastAPI:
-- `baseUrl`: `'https://8000-agq6gs7y3hvdgpfa33qiputqnm.instabox.tech'`
-- `predictNetV2`: `'/predict/netv2'`
-- `predictSvm`: `'/predict/svm'`
-- `timeout`: `Duration(seconds: 30)`
+Konfigurasi terpusat untuk endpoint dan kredensial backend FastAPI dengan mode ketat melalui `--dart-define` / `--dart-define-from-file=env.json` (panduan lengkap di `BUILDGUIDE.md`, template di `env.example.json`):
+- `baseUrl`: `String.fromEnvironment('API_BASE_URL', defaultValue: '')` (wajib diisi; tidak ada URL *hardcode* di kode sumber)
+- `apiKey`: `String.fromEnvironment('API_KEY', defaultValue: '')` (dikirim via header `X-API-Key` bila terisi)
+- `predictNetV2`: `'/predict/netv2'`, `predictSvm`: `'/predict/svm'`, `health`: `'/health'`
+- `timeout`: `Duration(seconds: int.fromEnvironment('API_TIMEOUT_SECONDS', defaultValue: 30))`
+- `normalizeAndValidateBaseUrl(raw)`: menolak nilai kosong serta memvalidasi skema `http`/`https`, host non-kosong, dan normalisasi trailing slash.
 
 #### `lib/data/api/dio_client.dart`
 
-Factory `DioClient.create({baseUrl, timeout})` yang menyiapkan instance `Dio` dengan `BaseOptions` (`baseUrl`, `connectTimeout`, `sendTimeout`, `receiveTimeout`, dan header `Accept: application/json`).
+Factory `DioClient.create({baseUrl, apiKey, timeout})` yang memvalidasi `baseUrl` lewat `ApiEndpoints.normalizeAndValidateBaseUrl(...)` dan menyiapkan instance `Dio` dengan `BaseOptions` (`connectTimeout`, `sendTimeout`, `receiveTimeout`, header `Accept: application/json`, dan header `X-API-Key` saat `apiKey` diisi).
 
 #### `lib/data/api/meat_prediction_remote_datasource.dart`
 
 Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemoteDataSourceImpl`:
 - Mengirim gambar sebagai `multipart/form-data` (field `'file'`) melalui `_dio.post(...)`.
 - Memeriksa keberadaan file lokal sebelum upload (melempar `ImageProcessingException` jika hilang).
-- Memetakan `DioException` (timeout, connection error, HTTP 400/413/422/5xx, bad certificate, `SocketException`) menjadi `NetworkException` atau `InferenceException`.
+- Memetakan `DioException` (timeout, connection error, HTTP `400`/`401`/`403`/`413`/`422`/`429` dengan pembacaan `Retry-After`/`5xx`, bad certificate, `SocketException`) menjadi `NetworkException` atau `InferenceException`.
 
 ---
 
@@ -532,6 +534,43 @@ Terletak di `lib/presentation/widgets/`:
 - [ ] **Widget tests lanjutan** — test interaksi layar Capture, Preview, Result, dan History
 - [ ] **Onboarding screen** — panduan penggunaan pertama kali
 - [ ] **Pengaturan** — dark mode toggle, bahasa, ukuran font
+
+---
+
+## 11. Audit Kelayakan Produksi & Rencana Perbaikan
+
+> Hasil audit menyeluruh terhadap `MobileApps/` (November 2026) untuk mempersiapkan aplikasi agar layak digunakan secara nyata oleh pengguna (*production-ready*).
+
+### 🔴 P0 — Kritis (Wajib Sebelum Rilis)
+
+| # | Temuan | Lokasi | Solusi yang Disarankan |
+|---|--------|--------|------------------------|
+| 1 | **Belum ada validasi objek non-daging** — foto selain daging tetap diklasifikasikan paksa menjadi `fresh`/`half_fresh`/`spoiled` dan disimpan ke SQLite. | `lib/data/models/prediction_response_model.dart`, `lib/domain/usecases/analyze_meat_usecase.dart`, `lib/presentation/result/result_screen.dart` | Tambahkan validasi non-daging di FastAPI (mis. `"is_meat": false`), lewati penyimpanan SQLite di use case, dan tampilkan kartu penolakan khusus di `ResultScreen`. |
+| 2 | ~~**URL backend di-hardcode ke host sementara tanpa autentikasi**~~ — **✅ Selesai.** URL *hardcode* dihapus total (`API_BASE_URL` memakai mode ketat `defaultValue: ''`). Konfigurasi kini wajib disuntikkan via `--dart-define` / `--dart-define-from-file=env.json` (`env.example.json`, panduan di `BUILDGUIDE.md`), divalidasi di `DioClient`, mengirim `X-API-Key`, serta memetakan HTTP `401`/`403`/`429`. Backend `FastAPI/` dilengkapi autentikasi `X-API-Key` & *sliding-window rate limiter*. | `lib/data/api/api_endpoints.dart`, `dio_client.dart`, `meat_prediction_remote_datasource.dart`, `BUILDGUIDE.md`, `FastAPI/security.py`, `FastAPI/main.py` | Terapkan `--dart-define-from-file=env.json` saat build rilis sesuai `BUILDGUIDE.md` dengan domain HTTPS permanen, `API_KEY` rahasia, dan `REQUIRE_API_KEY=true`. |
+| 3 | **Default model aktif masih `netv2`, bukan `svm`** — user yang langsung menekan `ANALISIS` tanpa memilih model akan memakai MobileNetV2. | `lib/presentation/providers/scan_provider.dart` (`_selectedModel`) | Ubah default ke `PredictionModelType.svm` (atau simpan preferensi model terakhir user). |
+| 4 | **Konfigurasi release Android masih template bawaan** — `namespace` masih `com.example.flutter_application_1`, build `release` memakai `debug` keystore, dan ikon launcher masih bawaan Flutter. | `android/app/build.gradle.kts`, `android/app/src/main/res/mipmap-*` | Selaraskan `namespace`, siapkan *release keystore* resmi, serta pasang ikon aplikasi & *splash screen* MeatFresh AI. |
+
+### 🟠 P1 — Bug Fungsional & Kebocoran Storage
+
+| # | Temuan | Lokasi | Solusi yang Disarankan |
+|---|--------|--------|------------------------|
+| 5 | **Pencarian berdasarkan ID tidak berfungsi** — placeholder menyebut `'CARI JENIS DAGING ATAU ID...'`, tetapi filter hanya mengecek `displayName` dan `meatType`. | `lib/presentation/providers/history_provider.dart` (`filteredItems`), `lib/presentation/history/history_screen.dart` | Tambahkan pencocokan terhadap `item.id.toString()` dan pola `#MF-<id>`. |
+| 6 | **Kebocoran file gambar (*orphan files*)** — file tersalin ke `Documents/scan_images/` sebelum request API dan tidak dihapus saat API gagal maupun saat `delete(id)` / `deleteAll()`. | `lib/domain/usecases/analyze_meat_usecase.dart`, `lib/data/repositories/classification_repository.dart` | Hapus file salinan jika API gagal/non-daging, serta hapus file fisik gambar terkait saat catatan riwayat dihapus. |
+| 7 | **Loading overlay belum memblokir tombol Back & cancel request** — menekan Back saat proses analisis bisa mem-pop `PreviewScreen` dan memicu navigasi route yang salah. | `lib/presentation/widgets/neo_loading.dart`, `lib/presentation/capture/capture_screen.dart` | Bungkus overlay dengan `PopScope(canPop: false)` atau tambahkan mekanisme `CancelToken` Dio. |
+| 8 | **Tombol `PINDAI LAGI` salah arah saat dibuka dari Riwayat** — `Navigator.pop(context)` mengembalikan user ke `HistoryScreen`, bukan ke `CaptureScreen`. | `lib/presentation/result/result_screen.dart`, `lib/presentation/history/history_screen.dart` | Arahkan `PINDAI LAGI` untuk kembali ke root lalu berpindah ke tab `PINDAI` (atau bedakan argumen asal navigasi). |
+| 9 | **Tombol `EKSPOR` masih placeholder & `deleteAll()` belum ada di UI** — tombol `EKSPOR` hanya menampilkan `"Fitur ekspor segera hadir"`. | `lib/presentation/history/history_screen.dart`, `lib/presentation/providers/history_provider.dart` | Implementasikan ekspor CSV/PDF (atau sembunyikan tombol sementara) dan tambahkan aksi `Hapus Semua` dengan konfirmasi. |
+
+### 🟡 P2 — UX, Performa & Keandalan Lapangan
+
+- [ ] **Izin kamera/galeri eksplisit (`permission_handler`)** — tambahkan alur permintaan izin & tombol *"Buka Pengaturan"* (`openAppSettings()`) di `CaptureScreen` saat izin ditolak permanen.
+- [ ] **Navigasi Back & pintasan Beranda** — tambahkan `PopScope` di `ShellScreen` agar tombol Back di tab `PINDAI`/`RIWAYAT` kembali ke `BERANDA` dulu; bedakan pintasan `UNGGAH DARI GALERI` di `HomeScreen` dan beri aksi pada ikon perisai di AppBar.
+- [ ] **Efisiensi animasi `CaptureScreen`** — hentikan `_pulseController` saat tab `PINDAI` tidak aktif di `IndexedStack` untuk menghemat CPU/baterai.
+- [ ] **Resiliensi error & panduan pengguna** — tambahkan tombol `COBA LAGI` di `_buildErrorState` serta `RefreshIndicator` di `HistoryScreen`; tambahkan panduan pencahayaan (hindari lampu terlalu kuning hangat di mana akurasi SVM Lanjutan turun ke `60,98%`) serta input opsional `meat_type`.
+
+### 🔵 P3 — Pengujian, Build & Dokumentasi
+
+- [ ] **Build ulang APK & regresi E2E pasca-redesain** — bangun ulang APK debug terbaru dan jalankan ulang `AutomationTest` (Appium) beserta skenario alur `PreviewScreen` → `SVM` → `ResultScreen`.
+- [ ] **Widget tests lanjutan & penyelarasan dokumen** — tambahkan widget test untuk `CaptureScreen`, `PreviewScreen`, `ResultScreen`, `HistoryScreen`, serta selaraskan `MobileApps/README.md`, `pubspec.yaml`, dan bagian arsitektur/desain pada `DOKUMENTASI.md` dengan kondisi terkini (FastAPI + modern *soft-UI*).
 
 ---
 

@@ -115,10 +115,22 @@ class MeatPredictionRemoteDataSourceImpl
     switch (statusCode) {
       case 400:
         return 'File bukan gambar yang valid.';
+      case 401:
+        return 'Autentikasi API gagal. Periksa konfigurasi API key.';
+      case 403:
+        return 'Akses ke layanan prediksi ditolak.';
       case 413:
         return 'Ukuran gambar terlalu besar (maksimal 10MB).';
       case 422:
         return 'Permintaan tidak valid oleh server.';
+      case 429:
+        final retryAfterRaw = response?.headers.value('retry-after')?.trim();
+        final retrySeconds =
+            retryAfterRaw != null ? int.tryParse(retryAfterRaw) : null;
+        if (retrySeconds != null && retrySeconds > 0) {
+          return 'Terlalu banyak permintaan. Coba lagi dalam $retrySeconds detik.';
+        }
+        return 'Terlalu banyak permintaan. Tunggu beberapa saat lalu coba lagi.';
       default:
         if (statusCode != null && statusCode >= 500) {
           return 'Server mengalami gangguan ($statusCode). Coba lagi nanti.';
