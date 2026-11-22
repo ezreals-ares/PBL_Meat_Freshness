@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../domain/models/prediction_model_type.dart';
 import '../providers/scan_provider.dart';
@@ -25,80 +26,198 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Widget build(BuildContext context) {
     final scanProvider = context.watch<ScanProvider>();
 
-    return Scaffold(
-      backgroundColor: AppColors.bgCanvas,
-      body: SafeArea(
-        child: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.bgCanvas,
+        body: Column(
           children: [
-            _buildAppBar(),
+            _buildTopBar(),
+            // Ruang gambar yang bersih & luas
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.margin),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Tampilan gambar — ruang fleksibel agar pas di berbagai ukuran layar
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.bgSurface,
-                          border: Border.all(
-                              color: AppColors.borderDefault, width: 3.0),
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.lg),
-                          boxShadow: [AppShadows.hard()],
-                        ),
-                        child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(AppRadius.lg - 3.0),
-                          child: Image.file(
-                            File(widget.imagePath),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (ctx, err, st) => const Center(
-                              child: Icon(Icons.broken_image,
-                                  size: 64,
-                                  color: AppColors.surfaceContainer),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.margin,
+                  AppSpacing.md,
+                  AppSpacing.margin,
+                  AppSpacing.md,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.bgSurface,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    boxShadow: [AppShadows.softCard()],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.file(
+                          File(widget.imagePath),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (ctx, err, st) => Container(
+                            color: AppColors.surfaceContainer,
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image_rounded,
+                                size: 56,
+                                color: AppColors.textTertiary,
+                              ),
                             ),
                           ),
                         ),
+                        // Frosted bottom photo guidance pill
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  AppColors.textPrimary.withValues(alpha: 0.72),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 16,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Pastikan daging terlihat jelas dan pencahayaan cukup.',
+                                    style: AppTextStyles.bodySm.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Floating bottom control sheet (Terinspirasi Screen 3 Design Guide)
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.xl),
+                ),
+                border: const Border(
+                  top: BorderSide(color: AppColors.borderSubtle, width: 1),
+                ),
+                boxShadow: [AppShadows.navBar()],
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.margin,
+                    18,
+                    AppSpacing.margin,
+                    16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildModelSelector(scanProvider),
+                      const SizedBox(height: 16),
+                      _GoldenPrimaryButton(
+                        text:
+                            'ANALISIS (${scanProvider.selectedModel.shortName})',
+                        icon: Icons.science_rounded,
+                        onPressed: widget.onAnalyze,
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Keterangan panduan
-                    Text(
-                      'Pastikan daging terlihat jelas dan pencahayaan cukup.',
-                      style: AppTextStyles.bodySm.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 10),
+                      _SecondaryGhostButton(
+                        text: 'PILIH FOTO LAIN',
+                        icon: Icons.photo_library_outlined,
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    // Pemilih model AI (NetV2 vs SVM)
-                    _buildModelSelector(scanProvider),
-                    const SizedBox(height: AppSpacing.md),
-                    // Tombol aksi
-                    _PressableButton(
-                      text: 'PILIH FOTO LAIN',
-                      icon: Icons.photo_library,
-                      isPrimary: false,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _PressableButton(
-                      text:
-                          'ANALISIS (${scanProvider.selectedModel.shortName})',
-                      icon: Icons.science,
-                      isPrimary: true,
-                      onPressed: widget.onAnalyze,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.tertiary,
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(AppRadius.lg),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, AppSpacing.margin, 14),
+          child: Row(
+            children: [
+              Material(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'PRATINJAU FOTO',
+                  style: AppTextStyles.headlineSm.copyWith(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  'SIAP PINDAI',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: Colors.white,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -112,25 +231,28 @@ class _PreviewScreenState extends State<PreviewScreen> {
           'PILIH MODEL AI',
           style: AppTextStyles.labelSm.copyWith(
             color: AppColors.textSecondary,
-            letterSpacing: 1.5,
+            letterSpacing: 1.1,
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: 8),
         Row(
           children: PredictionModelType.values.map((model) {
             final isSelected = scanProvider.selectedModel == model;
             final isLast = model == PredictionModelType.values.last;
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: isLast ? 0 : AppSpacing.sm),
+                padding: EdgeInsets.only(right: isLast ? 0 : 10),
                 child: _ModelOptionCard(
                   title: model.displayName,
                   subtitle: model.description,
                   icon: model == PredictionModelType.netv2
-                      ? Icons.hub
-                      : Icons.tune,
+                      ? Icons.hub_rounded
+                      : Icons.tune_rounded,
                   isSelected: isSelected,
-                  onTap: () => scanProvider.selectModel(model),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    scanProvider.selectModel(model);
+                  },
                 ),
               ),
             );
@@ -139,46 +261,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ],
     );
   }
-
-  Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.margin, vertical: AppSpacing.sm),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: const Icon(Icons.arrow_back,
-                  color: AppColors.textPrimary, size: 24),
-            ),
-          ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.borderDefault, width: 2),
-            ),
-            child:
-                const Icon(Icons.restaurant, color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 8),
-          Text('PRATINJAU FOTO', style: AppTextStyles.headlineSm),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
 }
 
-// ─── MODEL OPTION CARD ──────────────────────────────────────
 class _ModelOptionCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -199,43 +283,33 @@ class _ModelOptionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        transform: Matrix4.translationValues(
-          isSelected ? 1.0 : 0.0,
-          isSelected ? 1.0 : 0.0,
-          0.0,
-        ),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.secondaryFixed : AppColors.bgSurface,
+          color: isSelected ? AppColors.primarySoft : AppColors.bgCanvas,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: AppColors.borderDefault,
-            width: isSelected ? 3.0 : 2.0,
+            color: isSelected ? AppColors.primary : AppColors.borderSubtle,
+            width: isSelected ? 2.0 : 1.0,
           ),
-          boxShadow: [
-            isSelected ? AppShadows.hardSmall() : AppShadows.hardMedium(),
-          ],
         ),
         child: Row(
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.secondary
-                    : AppColors.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: AppColors.borderDefault, width: 1.5),
+                color: isSelected ? AppColors.primary : AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                size: 16,
-                color: isSelected ? AppColors.onSecondary : AppColors.textPrimary,
+                size: 18,
+                color: isSelected ? Colors.white : AppColors.tertiaryDark,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 9),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,15 +317,21 @@ class _ModelOptionCard extends StatelessWidget {
                   Text(
                     title,
                     style: AppTextStyles.labelMd.copyWith(
+                      color: isSelected
+                          ? AppColors.primaryDark
+                          : AppColors.textPrimary,
                       fontWeight: FontWeight.w800,
+                      fontSize: 12,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 1),
                   Text(
                     subtitle,
                     style: AppTextStyles.labelSm.copyWith(
                       color: AppColors.textSecondary,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
@@ -267,72 +347,109 @@ class _ModelOptionCard extends StatelessWidget {
   }
 }
 
-// ─── PRESSABLE BUTTON ───────────────────────────────────────
-class _PressableButton extends StatefulWidget {
+class _GoldenPrimaryButton extends StatefulWidget {
   final String text;
   final IconData icon;
-  final bool isPrimary;
   final VoidCallback onPressed;
 
-  const _PressableButton({
+  const _GoldenPrimaryButton({
     required this.text,
     required this.icon,
-    required this.isPrimary,
     required this.onPressed,
   });
 
   @override
-  State<_PressableButton> createState() => _PressableButtonState();
+  State<_GoldenPrimaryButton> createState() => _GoldenPrimaryButtonState();
 }
 
-class _PressableButtonState extends State<_PressableButton> {
-  bool _isPressed = false;
+class _GoldenPrimaryButtonState extends State<_GoldenPrimaryButton> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
-        setState(() => _isPressed = false);
+        setState(() => _pressed = false);
+        HapticFeedback.mediumImpact();
         widget.onPressed();
       },
-      onTapCancel: () => setState(() => _isPressed = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        transform: Matrix4.translationValues(
-            _isPressed ? 2.0 : 0.0, _isPressed ? 2.0 : 0.0, 0.0),
-        height: 56,
-        decoration: BoxDecoration(
-          color: widget.isPrimary
-              ? AppColors.primaryContainer
-              : AppColors.bgSurface,
-          border: Border.all(
-              color: AppColors.borderDefault,
-              width: widget.isPrimary ? 3.0 : 2.5),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            _isPressed ? AppShadows.hardSmall() : AppShadows.hard(),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(widget.icon,
-                size: 20,
-                color: widget.isPrimary
-                    ? AppColors.onPrimary
-                    : AppColors.textPrimary),
-            const SizedBox(width: 8),
-            Text(
-              widget.text,
-              style: AppTextStyles.labelLg.copyWith(
-                color: widget.isPrimary
-                    ? AppColors.onPrimary
-                    : AppColors.textPrimary,
-                letterSpacing: 1,
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            boxShadow: [AppShadows.glow(AppColors.accent, alpha: 0.35)],
+          ),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(widget.icon, size: 20, color: AppColors.onAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.text,
+                    style: AppTextStyles.labelLg.copyWith(
+                      color: AppColors.onAccent,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: AppColors.onAccent,
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryGhostButton extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _SecondaryGhostButton({
+    required this.text,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 19, color: AppColors.textPrimary),
+        label: Text(
+          text,
+          style: AppTextStyles.labelMd.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: AppColors.bgCanvas,
+          side: const BorderSide(color: AppColors.borderDefault, width: 1.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
         ),
       ),
     );
