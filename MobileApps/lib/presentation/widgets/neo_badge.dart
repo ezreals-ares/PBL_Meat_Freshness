@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
-/// Status badge for freshness results — FRESH / HALF-FRESH / SPOILED.
+/// Status badge pill modern untuk hasil kesegaran — FRESH / HALF-FRESH / SPOILED.
 class NeoBadge extends StatelessWidget {
   final String label;
   final Color backgroundColor;
@@ -18,21 +18,23 @@ class NeoBadge extends StatelessWidget {
 
   factory NeoBadge.fresh() => const NeoBadge(
         label: 'FRESH',
-        backgroundColor: AppColors.statusFresh,
-        icon: Icons.check_circle,
+        backgroundColor: AppColors.statusFreshSoft,
+        textColor: AppColors.statusFreshInk,
+        icon: Icons.verified_rounded,
       );
 
   factory NeoBadge.halfFresh() => const NeoBadge(
         label: 'HALF-FRESH',
-        backgroundColor: AppColors.statusHalf,
-        icon: Icons.warning,
+        backgroundColor: AppColors.statusHalfSoft,
+        textColor: AppColors.amberInk,
+        icon: Icons.warning_amber_rounded,
       );
 
   factory NeoBadge.spoiled() => const NeoBadge(
         label: 'SPOILED',
-        backgroundColor: AppColors.statusSpoiled,
-        textColor: AppColors.onPrimary,
-        icon: Icons.block,
+        backgroundColor: AppColors.statusSpoiledSoft,
+        textColor: AppColors.statusSpoiledInk,
+        icon: Icons.dangerous_rounded,
       );
 
   factory NeoBadge.fromResult(String result) {
@@ -51,12 +53,10 @@ class NeoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(AppRadius.full),
-        border: Border.all(color: AppColors.borderDefault, width: 2),
-        boxShadow: [AppShadows.hardSmall()],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -70,6 +70,7 @@ class NeoBadge extends StatelessWidget {
             style: AppTextStyles.labelSm.copyWith(
               color: textColor,
               fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
             ),
           ),
         ],
