@@ -1,14 +1,18 @@
 import io
+import logging
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import numpy as np
 from ai_edge_litert.interpreter import Interpreter
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from security import enforce_rate_limit, is_api_key_configured, verify_api_key
 from svm_pipeline import SVMClassifier
+
+logger = logging.getLogger("meat_freshness_api")
 
 BASE_DIR = Path(__file__).parent
 NETV2_MODEL_PATH = BASE_DIR / "mobilenetv2_meat_freshness_quantized.tflite"
@@ -76,6 +80,10 @@ def _format_prediction(model_name: str, probs: np.ndarray, **extra) -> dict:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not is_api_key_configured():
+        logger.warning(
+            "API_KEY belum disetel; endpoint prediksi berjalan dalam mode pengembangan tanpa autentikasi."
+        )
     app.state.netv2 = NetV2Classifier(NETV2_MODEL_PATH)
     app.state.svm = SVMClassifier(SVM_MODEL_PATH)
     yield
@@ -97,14 +105,20 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/predict/netv2")
+@app.post(
+    "/predict/netv2",
+    dependencies=[Depends(enforce_rate_limit), Depends(verify_api_key)],
+)
 async def predict_netv2(file: UploadFile = File(...)):
     image = await _read_uploaded_image(file)
     probs = app.state.netv2.predict(image)
     return _format_prediction("netv2", probs)
 
 
-@app.post("/predict/svm")
+@app.post(
+    "/predict/svm",
+    dependencies=[Depends(enforce_rate_limit), Depends(verify_api_key)],
+)
 async def predict_svm(file: UploadFile = File(...)):
     image = await _read_uploaded_image(file)
     probs, fallback = app.state.svm.predict(image)

@@ -11,11 +11,17 @@ class DioClient {
 
   static Dio create({
     String baseUrl = ApiEndpoints.baseUrl,
+    String apiKey = ApiEndpoints.apiKey,
     Duration timeout = ApiEndpoints.timeout,
   }) {
-    final normalizedBaseUrl = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
+    final normalizedBaseUrl =
+        ApiEndpoints.normalizeAndValidateBaseUrl(baseUrl);
+    final trimmedKey = apiKey.trim();
+
+    final headers = <String, dynamic>{
+      'Accept': 'application/json',
+      if (trimmedKey.isNotEmpty) ApiEndpoints.apiKeyHeader: trimmedKey,
+    };
 
     return Dio(
       BaseOptions(
@@ -23,9 +29,7 @@ class DioClient {
         connectTimeout: timeout,
         sendTimeout: timeout,
         receiveTimeout: timeout,
-        headers: const {
-          'Accept': 'application/json',
-        },
+        headers: headers,
       ),
     );
   }

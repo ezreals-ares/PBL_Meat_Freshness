@@ -5,3 +5,9 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-}
+      - REQUIRE_API_KEY=${REQUIRE_API_KEY:-false}
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-30}
+      - RATE_LIMIT_WINDOW_SECONDS=${RATE_LIMIT_WINDOW_SECONDS:-60}

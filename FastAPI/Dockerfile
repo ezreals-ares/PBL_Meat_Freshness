@@ -12,7 +12,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY main.py svm_pipeline.py mobilenetv2_meat_freshness_quantized.tflite svm_meat_fitur_lanjutan.pkl ./
+COPY main.py svm_pipeline.py security.py mobilenetv2_meat_freshness_quantized.tflite svm_meat_fitur_lanjutan.pkl ./
 
 ENV PATH="/app/.venv/bin:$PATH"
 
