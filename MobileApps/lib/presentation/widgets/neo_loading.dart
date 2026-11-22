@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
-/// Neobrutalist loading indicator — chunky bordered spinner + bold text label.
-///
-/// Can be used as an inline widget in a Stack, or shown/hidden globally
-/// using the static [show]/[hide] methods via Overlay.
+/// Indikator loading modern dengan kartu putih melayang & aksen Emerald/Amber.
 class NeoLoading extends StatelessWidget {
   final String text;
 
-  const NeoLoading({super.key, this.text = 'ANALYZING IMAGE...'});
+  const NeoLoading({super.key, this.text = 'MENGANALISIS GAMBAR...'});
 
   // ─── Overlay management ───────────────────────────────────
   static OverlayEntry? _overlayEntry;
 
-  /// Show the loading overlay on top of the current screen.
-  static void show(BuildContext context, {String text = 'ANALYZING IMAGE...'}) {
+  /// Tampilkan loading overlay di atas layar aktif.
+  static void show(BuildContext context, {String text = 'MENGANALISIS GAMBAR...'}) {
     if (_overlayEntry != null) return;
     _overlayEntry = OverlayEntry(
       builder: (_) => Positioned.fill(
@@ -27,7 +24,7 @@ class NeoLoading extends StatelessWidget {
     Overlay.of(context).insert(_overlayEntry!);
   }
 
-  /// Hide the loading overlay.
+  /// Sembunyikan loading overlay.
   static void hide() {
     _overlayEntry?.remove();
     _overlayEntry = null;
@@ -36,50 +33,53 @@ class NeoLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.bgCanvas.withValues(alpha: 0.85),
+      color: AppColors.textPrimary.withValues(alpha: 0.45),
       alignment: Alignment.center,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.xl,
+        ),
         decoration: BoxDecoration(
           color: AppColors.bgSurface,
-          border: Border.all(color: AppColors.borderDefault, width: 3.0),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [AppShadows.hard()],
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          boxShadow: [AppShadows.softCard()],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Spinner in a bordered circle
             Container(
-              width: 64,
-              height: 64,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer,
-                border: Border.all(color: AppColors.borderDefault, width: 3.0),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.tertiary],
+                ),
                 shape: BoxShape.circle,
-                boxShadow: [AppShadows.hardSmall()],
+                boxShadow: [AppShadows.glow(AppColors.primary, alpha: 0.28)],
               ),
-              padding: const EdgeInsets.all(AppSpacing.sm + 2),
+              padding: const EdgeInsets.all(16),
               child: const CircularProgressIndicator(
-                strokeWidth: 4.0,
-                color: AppColors.onPrimary,
+                strokeWidth: 3.5,
+                color: AppColors.accent,
+                backgroundColor: Color(0x33FFFFFF),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            // Bold label
+            const SizedBox(height: AppSpacing.lg),
             Text(
               text.toUpperCase(),
               style: AppTextStyles.labelLg.copyWith(
                 color: AppColors.textPrimary,
-                letterSpacing: 1.5,
+                letterSpacing: 0.8,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Please wait while we process your image.',
+              'Mohon tunggu sebentar, AI sedang memeriksa warna dan tekstur daging.',
               style: AppTextStyles.bodySm.copyWith(
                 color: AppColors.textSecondary,
               ),
