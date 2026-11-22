@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
-/// Reusable Neobrutalist card with hard offset shadow and thick border.
+/// Kartu modern lembut dengan sudut membulat dan bayangan halus.
 class NeoCard extends StatelessWidget {
   final Widget child;
   final Color? backgroundColor;
@@ -17,10 +17,10 @@ class NeoCard extends StatelessWidget {
     required this.child,
     this.backgroundColor,
     this.padding,
-    this.borderWidth = 2.5,
+    this.borderWidth = 1.0,
     this.borderRadius = AppRadius.lg,
-    this.shadowX = 4,
-    this.shadowY = 4,
+    this.shadowX = 0,
+    this.shadowY = 8,
     this.onTap,
   });
 
@@ -31,8 +31,10 @@ class NeoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor ?? AppColors.bgSurface,
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.borderDefault, width: borderWidth),
-        boxShadow: [AppShadows.hard(x: shadowX, y: shadowY)],
+        border: borderWidth > 0
+            ? Border.all(color: AppColors.borderSubtle, width: borderWidth)
+            : null,
+        boxShadow: [AppShadows.softCard()],
       ),
       child: child,
     );

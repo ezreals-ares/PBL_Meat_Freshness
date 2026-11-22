@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'theme/theme.dart';
 import 'home/home_screen.dart';
@@ -18,19 +19,16 @@ class _ShellScreenState extends State<ShellScreen> {
 
   static const int _historyTabIndex = 2;
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
   List<Widget> get _screens => [
-    HomeScreen(onNavigateToTab: _onTabSelected),
-    const CaptureScreen(),
-    const HistoryScreen(),
-  ];
+        HomeScreen(onNavigateToTab: _onTabSelected),
+        const CaptureScreen(),
+        const HistoryScreen(),
+      ];
 
   void _onTabSelected(int index) {
-    // Refresh riwayat setiap kali tab Riwayat dibuka
+    if (index != _currentIndex) {
+      HapticFeedback.selectionClick();
+    }
     if (index == _historyTabIndex) {
       context.read<HistoryProvider>().loadHistory();
     }
@@ -40,6 +38,7 @@ class _ShellScreenState extends State<ShellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bgCanvas,
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
@@ -51,58 +50,99 @@ class _ShellScreenState extends State<ShellScreen> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.bgSurface.withValues(alpha: 0.95),
+        color: AppColors.bgSurface,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
+        border: const Border(
+          top: BorderSide(color: AppColors.borderSubtle, width: 1),
+        ),
+        boxShadow: [AppShadows.navBar()],
       ),
       child: SafeArea(
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: AppSpacing.margin),
-            child: Row(
-              children: [
-                _buildNavItem(0, Icons.cottage, 'BERANDA'),
-                const SizedBox(width: AppSpacing.sm),
-                _buildNavItem(1, Icons.document_scanner, 'PINDAI'),
-                const SizedBox(width: AppSpacing.sm),
-                _buildNavItem(2, Icons.receipt_long, 'RIWAYAT'),
-              ],
-            ),
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.margin,
+            10,
+            AppSpacing.margin,
+            10,
+          ),
+          child: Row(
+            children: [
+              _buildNavItem(
+                index: 0,
+                icon: Icons.home_rounded,
+                inactiveIcon: Icons.home_outlined,
+                label: 'BERANDA',
+              ),
+              const SizedBox(width: 10),
+              _buildNavItem(
+                index: 1,
+                icon: Icons.document_scanner_rounded,
+                inactiveIcon: Icons.document_scanner_outlined,
+                label: 'PINDAI',
+                isCenterPrimary: true,
+              ),
+              const SizedBox(width: 10),
+              _buildNavItem(
+                index: 2,
+                icon: Icons.receipt_long_rounded,
+                inactiveIcon: Icons.receipt_long_outlined,
+                label: 'RIWAYAT',
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData inactiveIcon,
+    required String label,
+    bool isCenterPrimary = false,
+  }) {
     final isActive = _currentIndex == index;
+    final activeBg = isCenterPrimary ? AppColors.primary : AppColors.primarySoft;
+    final activeFg = isCenterPrimary ? AppColors.onPrimary : AppColors.primary;
+    final activeIconColor =
+        isCenterPrimary ? AppColors.accent : AppColors.primary;
+
     return Expanded(
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => _onTabSelected(index),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: 48,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: 54,
           decoration: BoxDecoration(
-            color: isActive ? AppColors.primaryContainer : Colors.transparent,
+            color: isActive ? activeBg : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.md),
+            boxShadow: isActive && isCenterPrimary
+                ? [AppShadows.glow(AppColors.primary, alpha: 0.25)]
+                : null,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  size: 22,
-                  color: isActive
-                      ? AppColors.onPrimary
-                      : AppColors.textPrimary),
-              const SizedBox(height: 2),
+              Icon(
+                isActive ? icon : inactiveIcon,
+                size: 22,
+                color: isActive ? activeIconColor : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 3),
               Text(
                 label,
-                style: AppTextStyles.labelMd.copyWith(
-                  color: isActive
-                      ? AppColors.onPrimary
-                      : AppColors.textPrimary,
-                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w700,
-                  letterSpacing: 1.2,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelSm.copyWith(
+                  color: isActive ? activeFg : AppColors.textSecondary,
+                  fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                  letterSpacing: 0.6,
                 ),
               ),
             ],

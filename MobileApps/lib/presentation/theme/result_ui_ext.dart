@@ -37,9 +37,6 @@ extension PredictionModelTypeUiExt on PredictionModelType {
 }
 
 /// Extension Flutter untuk [ClassificationResult] agar domain dan core tetap murni Dart.
-///
-/// Getter [statusColor] dan [statusIcon] membutuhkan `package:flutter` sehingga
-/// ditempatkan di presentation layer.
 extension ClassificationResultUiExt on ClassificationResult {
   /// Nama model AI untuk ditampilkan pada halaman hasil.
   String get modelDisplayName => modelType?.displayName ?? 'LOKAL';
@@ -47,7 +44,7 @@ extension ClassificationResultUiExt on ClassificationResult {
   /// Label singkat model untuk badge riwayat.
   String get modelShortName => modelType?.shortName ?? '';
 
-  /// Warna status sesuai hasil klasifikasi.
+  /// Warna utama status sesuai hasil klasifikasi.
   Color get statusColor {
     switch (result) {
       case 'fresh':
@@ -57,7 +54,49 @@ extension ClassificationResultUiExt on ClassificationResult {
       case 'spoiled':
         return AppColors.statusSpoiled;
       default:
+        return AppColors.tertiary;
+    }
+  }
+
+  /// Warna container lembut untuk badge/kartu status.
+  Color get statusSoftColor {
+    switch (result) {
+      case 'fresh':
+        return AppColors.statusFreshSoft;
+      case 'half_fresh':
+        return AppColors.statusHalfSoft;
+      case 'spoiled':
+        return AppColors.statusSpoiledSoft;
+      default:
         return AppColors.surfaceContainer;
+    }
+  }
+
+  /// Warna teks ber-kontras tinggi di atas [statusColor].
+  Color get statusOnColor {
+    switch (result) {
+      case 'fresh':
+        return AppColors.onPrimary;
+      case 'half_fresh':
+        return AppColors.onAccent;
+      case 'spoiled':
+        return AppColors.onError;
+      default:
+        return AppColors.onPrimary;
+    }
+  }
+
+  /// Warna teks ber-kontras tinggi di atas [statusSoftColor].
+  Color get statusInkColor {
+    switch (result) {
+      case 'fresh':
+        return AppColors.statusFreshInk;
+      case 'half_fresh':
+        return AppColors.amberInk;
+      case 'spoiled':
+        return AppColors.statusSpoiledInk;
+      default:
+        return AppColors.textPrimary;
     }
   }
 
@@ -65,13 +104,27 @@ extension ClassificationResultUiExt on ClassificationResult {
   IconData get statusIcon {
     switch (result) {
       case 'fresh':
-        return Icons.check_circle;
+        return Icons.verified_rounded;
       case 'half_fresh':
-        return Icons.warning;
+        return Icons.warning_amber_rounded;
       case 'spoiled':
-        return Icons.block;
+        return Icons.dangerous_rounded;
       default:
-        return Icons.help;
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  /// Ringkasan saran singkat per status kesegaran.
+  String get statusAdvice {
+    switch (result) {
+      case 'fresh':
+        return 'Warna dan permukaan tampak segar. Aman untuk diolah atau disimpan di chiller.';
+      case 'half_fresh':
+        return 'Kesegaran mulai menurun. Segera masak hingga matang sempurna dan cek aroma.';
+      case 'spoiled':
+        return 'Indikasi pembusukan terdeteksi. Sebaiknya tidak dikonsumsi demi keamanan pangan.';
+      default:
+        return 'Periksa kembali kondisi fisik dan aroma daging sebelum diolah.';
     }
   }
 }
