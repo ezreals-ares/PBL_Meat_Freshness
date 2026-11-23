@@ -4,32 +4,37 @@
 **Repository:** [ezreals-ares/PBL_Meat_Freshness](https://github.com/ezreals-ares/PBL_Meat_Freshness)
 **Branch yang dilaporkan:** `dev` (branch aktif pengembangan)
 **Periode commit:** 9 September 2026 – 22 November 2026
-**Tanggal laporan dibuat:** 22 November 2026, 13.20 WIB
-**Sumber data:** Riwayat commit GitHub branch `dev`, dicek langsung pada 22 November 2026
+**Tanggal laporan dibuat:** 24 November 2026, 00.00 WIB
+**Sumber data:** Riwayat commit GitHub branch `dev`, dicek langsung pada 24 November 2026
 
 ## Ringkasan
 
-Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode tersebut.
+Total **63 commit** oleh **4 kontributor** di branch `dev` selama periode tersebut.
 
 | Anggota | GitHub | Peran | Commit | Persentase | Commit pertama | Commit terakhir |
 |---|---|---|---|---|---|---|
-| Nawaf Azril Annaufal | `ezreals-ares` | Project Manager | 40 | 69.0% | 09 Sep 2026 11.12 WIB | 22 Nov 2026 12.09 WIB |
-| Rafi Abyantara Pratama | `rafi1624` | Mobile Engineer | 13 | 22.4% | 22 Oct 2026 09.26 WIB | 22 Nov 2026 12.07 WIB |
-| Adellia Salsa Al Barra | `Adellia03` | QA / Tester — QA Lead | 3 | 5.2% | 12 Oct 2026 09.46 WIB | 12 Oct 2026 09.57 WIB |
-| Bima Adiwijaya | `bimaadiwijaya8` | ML Engineer | 2 | 3.4% | 21 Oct 2026 16.44 WIB | 02 Nov 2026 06.46 WIB |
+| Nawaf Azril Annaufal | `ezreals-ares` | Project Manager | 45 | 71.4% | 09 Sep 2026 11.12 WIB | 22 Nov 2026 13.56 WIB |
+| Rafi Abyantara Pratama | `rafi1624` | Mobile Engineer | 13 | 20.6% | 22 Okt 2026 09.26 WIB | 22 Nov 2026 12.07 WIB |
+| Adellia Salsa Al Barra | `Adellia03` | QA / Tester — QA Lead | 3 | 4.8% | 12 Okt 2026 09.46 WIB | 12 Okt 2026 09.57 WIB |
+| Bima Adiwijaya | `bimaadiwijaya8` | ML Engineer | 2 | 3.2% | 21 Okt 2026 16.44 WIB | 02 Nov 2026 06.46 WIB |
 
 ## Nawaf Azril Annaufal — Project Manager
 
 - **GitHub:** [ezreals-ares](https://github.com/ezreals-ares)
-- **Total commit di `dev`:** 40 (27 commit langsung, 13 merge commit)
-- **Periode aktif:** 09 Sep 2026 11.12 – 22 Nov 2026 12.09 WIB
+- **Total commit di `dev`:** 45 (30 commit langsung, 15 merge commit)
+- **Periode aktif:** 09 Sep 2026 11.12 – 22 Nov 2026 13.56 WIB
 
-**Fokus pekerjaan:** inisiasi Flutter, FastAPI (`/predict/svm` dan `/predict/netv2`, autentikasi API key, rate limiting), integrasi Dio dan arsitektur domain/data/presentation, dokumentasi, serta me-merge PR dari branch fs1, fs3, dan fs4.
+**Fokus pekerjaan:** inisiasi Flutter, FastAPI (`/predict/svm` dan `/predict/netv2`, autentikasi API key, rate limiting), integrasi Dio dan arsitektur domain/data/presentation, dokumentasi dan README, pengujian E2E Appium WebdriverIO dengan Allure reporting, serta me-merge PR dari branch fs1, fs3, dan fs4.
 
 ### Daftar commit
 
 | Tanggal (WIB) | SHA | Pesan commit |
 |---|---|---|
+| 22 Nov 2026 13.56 | `39e7794` | feat: add CommitReport.md |
+| 22 Nov 2026 13.43 | `aa193fc` | Merge pull request #12 from ezreals-ares/fs1 |
+| 22 Nov 2026 13.40 | `41b2910` | feat: add LICENSE file and update README.md with project details and usage instructions |
+| 22 Nov 2026 13.07 | `6004bad` | Merge branch 'dev' of https://github.com/ezreals-ares/PBL_Meat_Freshness into fs1 |
+| 22 Nov 2026 13.01 | `9ddbde9` | test(e2e): add Appium WebdriverIO suite with Allure reporting |
 | 22 Nov 2026 12.09 | `f66ce29` | Merge pull request #11 from ezreals-ares/fs4 |
 | 22 Nov 2026 11.27 | `0604b3e` | Merge pull request #10 from ezreals-ares/fs1 |
 | 20 Nov 2026 02.22 | `7439290` | feat(mobile): require dart-define API config, API key header, and build guide |
@@ -62,11 +67,11 @@ Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode terseb
 | 09 Nov 2026 08.54 | `90662bb` | feat: refactor classification data handling with ClassificationModel and update DAO methods |
 | 09 Nov 2026 08.50 | `ac54024` | feat: add ClassificationResult extension for UI representation |
 | 02 Nov 2026 07.00 | `01855fc` | Merge pull request #4 from ezreals-ares/fs3 |
-| 22 Oct 2026 19.31 | `9efcd17` | Merge pull request #3 from ezreals-ares/fs1 |
-| 22 Oct 2026 19.27 | `9a18d9e` | docs(readme): update readme & gitignore |
-| 21 Oct 2026 18.09 | `44f3f5a` | Merge pull request #2 from ezreals-ares/fs3 |
-| 12 Oct 2026 07.38 | `0b3b6cf` | Merge remote-tracking branch 'origin/dev' into fs1 |
-| 12 Oct 2026 07.27 | `4ec02e7` | PBL Init |
+| 22 Okt 2026 19.31 | `9efcd17` | Merge pull request #3 from ezreals-ares/fs1 |
+| 22 Okt 2026 19.27 | `9a18d9e` | docs(readme): update readme & gitignore |
+| 21 Okt 2026 18.09 | `44f3f5a` | Merge pull request #2 from ezreals-ares/fs3 |
+| 12 Okt 2026 07.38 | `0b3b6cf` | Merge remote-tracking branch 'origin/dev' into fs1 |
+| 12 Okt 2026 07.27 | `4ec02e7` | PBL Init |
 | 10 Sep 2026 01.46 | `0f88b21` | Merge pull request #1 from ezreals-ares/fs1 |
 | 10 Sep 2026 01.43 | `ef05122` | Flutter Init |
 | 09 Sep 2026 11.12 | `941c3e7` | Initial commit |
@@ -75,7 +80,7 @@ Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode terseb
 
 - **GitHub:** [rafi1624](https://github.com/rafi1624)
 - **Total commit di `dev`:** 13 (12 commit langsung, 1 merge commit)
-- **Periode aktif:** 22 Oct 2026 09.26 – 22 Nov 2026 12.07 WIB
+- **Periode aktif:** 22 Okt 2026 09.26 – 22 Nov 2026 12.07 WIB
 
 **Fokus pekerjaan:** implementasi dan redesign aplikasi Flutter — tema neo-brutalist, dashboard, kamera/scan, hasil klasifikasi, riwayat scan, navigasi, widget, serta model ShuffleNet.
 
@@ -95,13 +100,13 @@ Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode terseb
 | 16 Nov 2026 06.59 | `9a3dd5c` | fix: bug history |
 | 09 Nov 2026 09.59 | `c3bafb8` | refactor: syncronize |
 | 09 Nov 2026 09.50 | `fb1e6cc` | Merge branch 'dev' of https://github.com/ezreals-ares/PBL_Meat_Freshness into fs4 |
-| 22 Oct 2026 09.26 | `25666f6` | feat(model): add model shufflenet |
+| 22 Okt 2026 09.26 | `25666f6` | feat(model): add model shufflenet |
 
 ## Adellia Salsa Al Barra — QA / Tester — QA Lead
 
 - **GitHub:** `Adellia03`
 - **Total commit di `dev`:** 3
-- **Periode aktif:** 12 Oct 2026 09.46 – 12 Oct 2026 09.57 WIB
+- **Periode aktif:** 12 Okt 2026 09.46 – 12 Okt 2026 09.57 WIB
 
 **Fokus pekerjaan:** inisiasi awal proyek (PBL Init) dan rekomendasi penyimpanan.
 
@@ -109,15 +114,15 @@ Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode terseb
 
 | Tanggal (WIB) | SHA | Pesan commit |
 |---|---|---|
-| 12 Oct 2026 09.57 | `9a4f93d` | PBL Init |
-| 12 Oct 2026 09.54 | `adea119` | PBL Init |
-| 12 Oct 2026 09.46 | `8d00558` | Menambahkan Rekomendasi Penyimpanan |
+| 12 Okt 2026 09.57 | `9a4f93d` | PBL Init |
+| 12 Okt 2026 09.54 | `adea119` | PBL Init |
+| 12 Okt 2026 09.46 | `8d00558` | Menambahkan Rekomendasi Penyimpanan |
 
 ## Bima Adiwijaya — ML Engineer
 
 - **GitHub:** [bimaadiwijaya8](https://github.com/bimaadiwijaya8)
 - **Total commit di `dev`:** 2
-- **Periode aktif:** 21 Oct 2026 16.44 – 02 Nov 2026 06.46 WIB
+- **Periode aktif:** 21 Okt 2026 16.44 – 02 Nov 2026 06.46 WIB
 
 **Fokus pekerjaan:** pelatihan model MobileNetV2 di Google Colab, dikirim via branch fs3 (PR #2 dan PR #4).
 
@@ -126,15 +131,15 @@ Total **58 commit** oleh **4 kontributor** di branch `dev` selama periode terseb
 | Tanggal (WIB) | SHA | Pesan commit |
 |---|---|---|
 | 02 Nov 2026 06.46 | `4ac340a` | Dibuat menggunakan Colab |
-| 21 Oct 2026 16.44 | `c6c1665` | Dibuat menggunakan Colab |
+| 21 Okt 2026 16.44 | `c6c1665` | Dibuat menggunakan Colab |
 
-## Status Branch Lain (per 22 November 2026)
+## Status Branch Lain (per 24 November 2026)
 
 | Branch | Keterangan |
 |---|---|
-| `dev` | Branch aktif. 58 commit, 4 kontributor. Commit terakhir: merge PR #11 (fs4) oleh Nawaf, 22 November 2026 pukul 12.09 WIB. |
-| `fs1` | 60 commit — sama dengan `dev` ditambah 2 commit yang **belum masuk `dev`**: `9ddbde9` test E2E Appium WebdriverIO dengan Allure reporting (Nawaf, 22 Nov 2026) dan `6004bad` merge `dev` ke `fs1` (Nawaf, 22 Nov 2026). |
+| `dev` | Branch aktif. 63 commit, 4 kontributor. Commit terakhir: `feat: add CommitReport.md` oleh Nawaf, 22 November 2026 pukul 13.56 WIB. |
+| `fs1` | 61 commit — seluruh isi fs1 sudah masuk `dev` lewat PR #12 (merge 22 Nov 2026 pukul 13.43 WIB). fs1 tertinggal 2 commit dari `dev`: `aa193fc` (merge PR #12) dan `39e7794` (CommitReport.md). |
 | `fs4` | 57 commit, isinya pekerjaan Rafi (redesign UI 22 Nov 2026). Sudah di-merge ke `dev` lewat PR #11. |
 | `fs3` | 3 commit — 2 commit Bima (Colab, 21 Okt dan 1 Nov 2026) ditambah initial commit. Keduanya sudah masuk `dev` lewat PR #2 dan PR #4. |
-| `fs2` | Hanya initial commit (9 Sep 2026). Tidak ada pekerjaan tercatat di branch ini. |
+| `fs2` | 64 commit — berisi seluruh 63 commit `dev` ditambah 1 commit `b9c6260` "add integration_test" oleh Adellia03 (23 Nov 2026 04.57 WIB). Commit tambahan ini belum di-merge ke `dev`. |
 | `production` | Hanya initial commit (9 Sep 2026). Belum ada rilis yang di-merge ke branch ini. |
