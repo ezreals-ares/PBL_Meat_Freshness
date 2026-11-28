@@ -94,10 +94,11 @@ MobileApps/
 │   │   │   └── app_exceptions.dart        ← Exception internal khusus Data Layer
 │   │   ├── models/                        ← Mapper eksternal (JSON & SQLite)
 │   │   │   ├── classification_model.dart  ← Model SQLite + konversi toEntity()
+│   │   │   ├── model_type_codec.dart      ← Codec murni Dart ('netv2'/'svm' ↔ enum)
 │   │   │   └── prediction_response_model.dart ← Parsing JSON FastAPI + normalisasi label
 │   │   └── repositories/                  ← Implementasi kontrak domain (konversi Exception → Failure)
-│   │       ├── classification_repository.dart        ← ClassificationRepositoryImpl
-│   │       ├── local_image_storage_repository.dart   ← LocalImageStorageRepository
+│   │       ├── sqlite_classification_repository.dart  ← SqliteClassificationRepository
+│   │       ├── local_image_storage_repository.dart    ← LocalImageStorageRepository
 │   │       └── remote_meat_classifier_repository.dart ← RemoteMeatClassifierRepository
 │   │
 │   ├── domain/                            ← Business logic & kontrak (100% murni Dart)
@@ -156,14 +157,16 @@ MobileApps/
 │   ├── images/
 │   │   └── hero_fresh_meat.jpg            ← Foto hero daging segar untuk Beranda
 │   └── model/                             ← Direktori asset model
-├── test/                                  ← Unit & widget tests (29 test)
+├── test/                                  ← Unit & widget tests (53 test)
 │   ├── analyze_meat_usecase_test.dart
 │   ├── classification_model_test.dart
 │   ├── format_test.dart
 │   ├── history_screen_test.dart
+│   ├── local_image_storage_repository_test.dart
 │   ├── prediction_response_model_test.dart
 │   ├── redesign_screens_test.dart
 │   ├── remote_meat_classifier_repository_test.dart
+│   ├── sqlite_classification_repository_test.dart
 │   └── widget_test.dart
 ├── pubspec.yaml                           ← Deklarasi dependensi & assets
 ├── pubspec.lock                           ← Lock file versi dependensi
@@ -207,7 +210,7 @@ Proyek ini mengikuti pola **Clean Architecture (Layer-first)** dengan arah depen
 ┌────────────────────▼────────────────────────────────────┐
 │                     DATA LAYER                          │
 │                                                         │
-│  ClassificationRepositoryImpl   → ClassificationDao → DB  │
+│  SqliteClassificationRepository → ClassificationDao → DB  │
 │  RemoteMeatClassifierRepository → RemoteDataSource → Dio│
 │  LocalImageStorageRepository    → File Storage          │
 │  Models: ClassificationModel, PredictionResponseModel   │
@@ -242,7 +245,7 @@ File paling awal yang dieksekusi Flutter saat aplikasi dijalankan, sekaligus ber
 1. `WidgetsFlutterBinding.ensureInitialized()` — memastikan binding Flutter siap sebelum plugin digunakan.
 2. `SystemChrome.setPreferredOrientations([portraitUp])` — mengunci orientasi aplikasi ke **portrait**.
 3. `SystemChrome.setSystemUIOverlayStyle(...)` — membuat **status bar transparan** dengan ikon gelap.
-4. **Wiring DI terpusat:** merakit `DioClient.create()`, `MeatPredictionRemoteDataSourceImpl`, `RemoteMeatClassifierRepository`, `LocalImageStorageRepository`, `ClassificationDao`, `ClassificationRepositoryImpl`, dan `AnalyzeMeatUseCase`.
+4. **Wiring DI terpusat:** merakit `DioClient.create()`, `MeatPredictionRemoteDataSourceImpl`, `RemoteMeatClassifierRepository`, `LocalImageStorageRepository`, `ClassificationDao`, `SqliteClassificationRepository`, dan `AnalyzeMeatUseCase`.
 5. `runApp(MultiProvider(...))` — menyuntikkan `ScanProvider` dan `HistoryProvider` ke widget tree.
 
 #### `lib/app.dart`
@@ -283,20 +286,20 @@ Fungsi murni `formatScanTimestamp(DateTime dateTime)` menggunakan `DateFormat('d
 Konfigurasi terpusat untuk endpoint dan kredensial backend FastAPI dengan mode ketat melalui `--dart-define` / `--dart-define-from-file=env.json` (panduan lengkap di `BUILDGUIDE.md`, template di `env.example.json`):
 - `baseUrl`: `String.fromEnvironment('API_BASE_URL', defaultValue: '')` (wajib diisi; tidak ada URL *hardcode* di kode sumber)
 - `apiKey`: `String.fromEnvironment('API_KEY', defaultValue: '')` (dikirim via header `X-API-Key` bila terisi)
-- `predictNetV2`: `'/predict/netv2'`, `predictSvm`: `'/predict/svm'`, `health`: `'/health'`
+- `predictNetV2`: `'/predict/netv2'`, `predictSvm`: `'/predict/svm'`, `maxUploadBytes`: `10 * 1024 * 1024` (10MB, selaras dengan batas FastAPI)
 - `timeout`: `Duration(seconds: int.fromEnvironment('API_TIMEOUT_SECONDS', defaultValue: 30))`
 - `normalizeAndValidateBaseUrl(raw)`: menolak nilai kosong serta memvalidasi skema `http`/`https`, host non-kosong, dan normalisasi trailing slash.
 
 #### `lib/data/api/dio_client.dart`
 
-Factory `DioClient.create({baseUrl, apiKey, timeout})` yang memvalidasi `baseUrl` lewat `ApiEndpoints.normalizeAndValidateBaseUrl(...)` dan menyiapkan instance `Dio` dengan `BaseOptions` (`connectTimeout`, `sendTimeout`, `receiveTimeout`, header `Accept: application/json`, dan header `X-API-Key` saat `apiKey` diisi).
+Factory `DioClient.create({baseUrl, apiKey, timeout})` yang memvalidasi `timeout > Duration.zero` dan `baseUrl` lewat `ApiEndpoints.normalizeAndValidateBaseUrl(...)`, lalu menyiapkan instance `Dio` dengan `BaseOptions` (`connectTimeout`, `sendTimeout`, `receiveTimeout`, header `Accept: application/json`, dan header `X-API-Key` saat `apiKey` diisi).
 
 #### `lib/data/api/meat_prediction_remote_datasource.dart`
 
 Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemoteDataSourceImpl`:
-- Mengirim gambar sebagai `multipart/form-data` (field `'file'`) melalui `_dio.post(...)`.
-- Memeriksa keberadaan file lokal sebelum upload (melempar `ImageProcessingException` jika hilang).
-- Memetakan `DioException` (timeout, connection error, HTTP `400`/`401`/`403`/`413`/`422`/`429` dengan pembacaan `Retry-After`/`5xx`, bad certificate, `SocketException`) menjadi `NetworkException` atau `InferenceException`.
+- Memeriksa keberadaan file lokal, ukuran > 0 byte, dan batas maksimal `ApiEndpoints.maxUploadBytes` (10MB) sebelum upload untuk menghindari pengiriman sia-sia (melempar `ImageProcessingException`).
+- Mengirim gambar sebagai `multipart/form-data` (field `'file'`) melalui `_dio.post(...)` agar boundary multipart dikelola otomatis oleh Dio.
+- Memetakan `DioException` (timeout, connection error, HTTP `400`/`401`/`403`/`413`/`422`/`429` dengan pembacaan `Retry-After`/`5xx`, bad certificate, `SocketException`) serta menormalisasi `detail` non-kosong menjadi `NetworkException` atau `InferenceException`.
 
 ---
 
@@ -304,7 +307,7 @@ Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemo
 
 #### `lib/data/db/db_helper.dart`
 
-**Singleton** yang mengelola koneksi ke database SQLite `meatfresh.db` (versi 2, mendukung migrasi otomatis `onUpgrade` dari v1 ke v2) dan mengeksekusi `CREATE TABLE classifications`.
+**Singleton** yang mengelola koneksi ke database SQLite `meatfresh.db` secara aman terhadap *concurrent cold start* via `_dbFuture` (versi 3, mendukung migrasi otomatis `onUpgrade` dari v1 → v2 → v3), mengeksekusi `CREATE TABLE classifications`, serta menambahkan index `idx_classifications_created_at` pada `(created_at DESC)`.
 
 #### `lib/data/db/classification_dao.dart`
 
@@ -314,6 +317,8 @@ Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemo
 |--------|--------|-----------|
 | `insert(ClassificationModel model)` | `Future<int>` | Simpan model baru ke SQLite, return ID yang di-generate |
 | `getAll()` | `Future<List<ClassificationModel>>` | Ambil semua record, urut terbaru dulu (`created_at DESC`) |
+| `getImagePathById(id)` | `Future<String?>` | Ambil `image_path` satu baris untuk sinkronisasi hapus file |
+| `getAllImagePaths()` | `Future<List<String>>` | Ambil seluruh `image_path` non-kosong untuk pembersihan massal |
 | `delete(id)` | `Future<int>` | Hapus satu record by ID |
 | `deleteAll()` | `Future<int>` | Hapus semua record |
 
@@ -325,29 +330,33 @@ Kontrak `MeatPredictionRemoteDataSource` dan implementasinya `MeatPredictionRemo
 
 Hierarki exception internal khusus Data Layer (`AppException`, `InferenceException`, `NetworkException`, `ImageProcessingException`). Exception ini hanya hidup di `lib/data/` dan wajib diubah menjadi `Failure` di layer repository.
 
+#### `lib/data/models/model_type_codec.dart`
+
+Codec murni Dart (`ModelTypeCodec.tryParse`, `ModelTypeCodec.encode`) yang memisahkan pemetaan string eksternal (`'netv2'`, `'svm'`) ↔ `PredictionModelType` agar `ClassificationModel` dan `PredictionResponseModel` tidak saling bergantung.
+
 #### `lib/data/models/classification_model.dart`
 
-**Data Model** yang memperluas `ClassificationResult` untuk serialisasi SQLite (`toMap()`, `fromMap()`), `fromEntity()`, dan `toEntity()`. Bebas dari import Flutter UI.
+**Data Model** yang memperluas `ClassificationResult` untuk serialisasi SQLite secara defensif (`toMap()`, `fromMap()` tahan terhadap JSON/tanggal korup dan nilai `model_used` tak dikenal), `fromEntity()` (lengkap dengan `isMeat` & `rejectionReason`), serta `toEntity()`. Bebas dari import Flutter UI.
 
 #### `lib/data/models/prediction_response_model.dart`
 
-Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`). Menormalisasi label `'half-fresh'` → `'half_fresh'`, memetakan string model (`'netv2'`/`'svm'`) lewat `parseModelType(...)`, membaca field validasi non-daging (`is_meat`, `reason`, `meat_coverage`), dan mengonversinya menjadi entity murni via `toEntity()`.
+Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`). Memvalidasi keberadaan `label` (melempar `InferenceException` bila kosong), menormalisasi label `'half-fresh'` → `'half_fresh'`, memetakan string model (`'netv2'`/`'svm'`) lewat `ModelTypeCodec` / `parseModelType(...)`, membaca field validasi non-daging (`is_meat`, `reason`, `meat_coverage`), dan mengonversinya menjadi entity murni via `toEntity()`.
 
 ---
 
 ### 📦 Data Layer — Repository
 
-#### `lib/data/repositories/classification_repository.dart`
+#### `lib/data/repositories/sqlite_classification_repository.dart`
 
-`ClassificationRepositoryImpl` mengimplementasikan `ClassificationRepository` dari domain. Membungkus operasi `ClassificationDao` dalam `try-catch`, mengonversi `ClassificationModel` menjadi entity via `.toEntity()`, dan mengembalikan `LocalFailure` jika terjadi error.
+`SqliteClassificationRepository` mengimplementasikan `ClassificationRepository` dari domain. Membungkus operasi `ClassificationDao` dalam `try-catch` dengan `developer.log`, mengonversi `ClassificationModel` menjadi entity via `.toEntity()`, mengembalikan `LocalFailure` jika terjadi error, dan membersihkan file fisik gambar via `ImageStorageRepository.deleteScanImage(...)` ketika catatan dihapus lewat `delete(id)` / `deleteAll()`.
 
 #### `lib/data/repositories/remote_meat_classifier_repository.dart`
 
-`RemoteMeatClassifierRepository` mengimplementasikan `MeatClassifierRepository`. Memetakan `PredictionModelType.netv2` → `ApiEndpoints.predictNetV2` dan `PredictionModelType.svm` → `ApiEndpoints.predictSvm`, lalu menangkap `NetworkException` / `ImageProcessingException` / `AppException` menjadi `ServerFailure`, `NetworkFailure`, atau `LocalFailure`.
+`RemoteMeatClassifierRepository` mengimplementasikan `MeatClassifierRepository`. Memetakan `PredictionModelType` secara *exhaustive* via `_endpointFor(modelType)` ke `ApiEndpoints.predictNetV2` / `ApiEndpoints.predictSvm`, mencatat error dengan `developer.log`, lalu menangkap `NetworkException` / `ImageProcessingException` / `AppException` menjadi `ServerFailure`, `NetworkFailure`, atau `LocalFailure`.
 
 #### `lib/data/repositories/local_image_storage_repository.dart`
 
-`LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<timestamp>.ext`, menyediakan `deleteScanImage(imagePath)` untuk membersihkan salinan saat request gagal/non-daging, dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
+`LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Memeriksa eksistensi file sumber, menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<microseconds>_<seq>.ext` agar bebas bentrokan nama, menyediakan `deleteScanImage(imagePath)` untuk membersihkan salinan saat request gagal/non-daging/riwayat dihapus, dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
 
 ---
 
@@ -420,11 +429,13 @@ Terletak di `lib/presentation/widgets/`:
 
 ### 🧪 Tests
 
-- `test/analyze_meat_usecase_test.dart` — Menguji skenario sukses `netv2`, sukses `svm`, `NetworkFailure` + cleanup gambar, penolakan `non_meat` tanpa simpan SQLite, dan `ValidationFailure`.
-- `test/classification_model_test.dart` — Menguji serialisasi `toMap`/`fromMap`/`toEntity` SQLite v2 dan kompatibilitas baris v1.
-- `test/prediction_response_model_test.dart` — Menguji parsing JSON FastAPI (`/predict/netv2` & `/predict/svm`), normalisasi `'half-fresh'` → `'half_fresh'`, `segmentation_fallback`, dan respons penolakan `is_meat: false`.
-- `test/remote_meat_classifier_repository_test.dart` — Menguji request multipart `Dio`, normalisasi `baseUrl`, header `X-API-Key`, HTTP `401`/`403`/`413`/`429`, dan respons `non_meat` menggunakan fake `HttpClientAdapter`.
-- `test/history_screen_test.dart` — Widget regression test kartu `half_fresh` pada layar sempit `360dp`.
+- `test/analyze_meat_usecase_test.dart` — Menguji skenario sukses `netv2`, sukses `svm`, `NetworkFailure` + cleanup gambar, penolakan `non_meat` tanpa simpan SQLite, `ValidationFailure`, dan pembersihan gambar saat `save()` DB gagal.
+- `test/classification_model_test.dart` — Menguji serialisasi `toMap`/`fromMap`/`toEntity` SQLite, kompatibilitas baris v1, `fromEntity` (`isMeat`/`rejectionReason`), dan ketahanan terhadap JSON/tanggal/model korup.
+- `test/prediction_response_model_test.dart` — Menguji parsing JSON FastAPI (`/predict/netv2` & `/predict/svm`), normalisasi `'half-fresh'` → `'half_fresh'`, `segmentation_fallback`, penolakan `is_meat: false`, error saat `label` kosong, serta ketahanan terhadap tipe field tak terduga.
+- `test/remote_meat_classifier_repository_test.dart` — Menguji request multipart `Dio`, normalisasi `baseUrl`, header `X-API-Key`, validasi `timeout <= 0`, *fail-fast* file hilang/0-byte/>10MB, HTTP `401`/`403`/`413`/`429`/`500` (detail spasi kosong), timeout/`SocketException`, dan respons `non_meat` menggunakan fake `HttpClientAdapter`.
+- `test/local_image_storage_repository_test.dart` — Menguji penyalinan ekstensi (`.png`/default `.jpg`), penamaan unik beruntun tanpa bentrokan, `LocalFailure` saat file sumber hilang, dan `deleteScanImage`.
+- `test/sqlite_classification_repository_test.dart` — Menguji `save`/`getAll`/`delete`/`deleteAll`, pemetaan error DAO ke `LocalFailure`, pembersihan gambar saat hapus (termasuk deduplikasi `image_path`), serta guard agar gambar tidak terhapus bila `delete` 0 baris atau DB gagal.
+- `test/history_screen_test.dart` — Widget regression test kartu `half_fresh` dan pencarian berbasis ID (`#MF-<id>` & numerik) pada layar sempit `360dp`.
 - `test/redesign_screens_test.dart` — Widget test layar `HomeScreen`, `ShellScreen`, `CaptureScreen`, `PreviewScreen`, dan `ResultScreen` (termasuk tampilan penolakan non-daging) pada viewport `360dp`.
 - `test/format_test.dart` — Menguji fungsi murni `formatScanTimestamp`.
 - `test/widget_test.dart` — Smoke test rendering `MeatFreshApp` dengan wiring DI.
@@ -485,9 +496,9 @@ Terletak di `lib/presentation/widgets/`:
 
 ## 7. Database Schema
 
-**File:** `meatfresh.db` (SQLite lokal)
+**File:** `meatfresh.db` (SQLite lokal, versi 3)
 
-**Tabel: `classifications`**
+**Tabel: `classifications`** *(index: `idx_classifications_created_at` pada `created_at DESC`)*
 
 | Kolom | Tipe | Constraint | Keterangan |
 |-------|------|-----------|-----------|
@@ -546,9 +557,9 @@ Terletak di `lib/presentation/widgets/`:
 - [x] Database SQLite lokal (`meatfresh.db`) & sinkronisasi otomatis daftar riwayat setelah scan
 - [x] Sistem desain **Fresh Meat Culinary** & seluruh 5 layar UI (Home, Capture, Preview, Result, History)
 - [x] **UI pemilih model (`netv2` vs `svm`)** — pilihan model di `PreviewScreen` terhubung ke `ScanProvider.selectModel(...)`
-- [x] **Tampilan detail probabilitas & info SVM fallback** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v2) dan ditampilkan di `ResultScreen` serta `HistoryScreen`
+- [x] **Tampilan detail probabilitas & info SVM fallback** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v3, terindeks pada `created_at DESC`) dan ditampilkan di `ResultScreen` serta `HistoryScreen`
 - [x] **Validasi non-daging (Opsi C) & pembersihan *orphan image*** — `isMeat: false` ditolak di `ResultScreen` tanpa disimpan ke SQLite
-- [x] Unit & widget tests (`29/29` lulus) + E2E Appium (`AutomationTest/`, `4/4` spec lulus)
+- [x] Unit & widget tests (`53/53` lulus) + E2E Appium (`AutomationTest/`, `4/4` spec lulus)
 - [x] Verifikasi `flutter analyze` bersih (`No issues found!`)
 
 ### 🚧 Masih TODO
@@ -584,7 +595,7 @@ Terletak di `lib/presentation/widgets/`:
 | # | Temuan | Lokasi | Solusi yang Disarankan |
 |---|--------|--------|------------------------|
 | 5 | ~~**Pencarian berdasarkan ID tidak berfungsi**~~ — **✅ Selesai.** `HistoryProvider.filteredItems` kini mencocokkan ID numerik, pola `mf-<id>`, dan `#mf-<id>` (teruji di `history_screen_test.dart`). | `lib/presentation/providers/history_provider.dart` (`filteredItems`), `test/history_screen_test.dart` | Pencocokan ID `#MF-<id>` dan `id` numerik sudah aktif. |
-| 6 | **Kebocoran file gambar (*orphan files*)** — file tersalin ke `Documents/scan_images/` sebelum request API dan tidak dihapus saat API gagal maupun saat `delete(id)` / `deleteAll()`. | `lib/domain/usecases/analyze_meat_usecase.dart`, `lib/data/repositories/classification_repository.dart` | Hapus file salinan jika API gagal/non-daging, serta hapus file fisik gambar terkait saat catatan riwayat dihapus. |
+| 6 | ~~**Kebocoran file gambar (*orphan files*)**~~ — **✅ Selesai.** `AnalyzeMeatUseCase` menghapus salinan gambar bila API gagal, non-daging, atau `save()` SQLite gagal; `SqliteClassificationRepository.delete(id)` & `deleteAll()` juga membersihkan file gambar lokal terkait via `ImageStorageRepository`. | `lib/domain/usecases/analyze_meat_usecase.dart`, `lib/data/repositories/sqlite_classification_repository.dart`, `lib/data/db/classification_dao.dart` | Pembersihan file gambar lokal sudah tersinkronisasi penuh dengan siklus hidup data SQLite. |
 | 7 | **Loading overlay belum memblokir tombol Back & cancel request** — menekan Back saat proses analisis bisa mem-pop `PreviewScreen` dan memicu navigasi route yang salah. | `lib/presentation/widgets/loading_overlay.dart`, `lib/presentation/capture/capture_screen.dart` | Bungkus overlay dengan `PopScope(canPop: false)` atau tambahkan mekanisme `CancelToken` Dio. |
 | 8 | **Tombol `PINDAI LAGI` salah arah saat dibuka dari Riwayat** — `Navigator.pop(context)` mengembalikan user ke `HistoryScreen`, bukan ke `CaptureScreen`. | `lib/presentation/result/result_screen.dart`, `lib/presentation/history/history_screen.dart` | Arahkan `PINDAI LAGI` untuk kembali ke root lalu berpindah ke tab `PINDAI` (atau bedakan argumen asal navigasi). |
 | 9 | **Tombol `EKSPOR` masih placeholder & `deleteAll()` belum ada di UI** — tombol `EKSPOR` hanya menampilkan `"Fitur ekspor segera hadir"`. | `lib/presentation/history/history_screen.dart`, `lib/presentation/providers/history_provider.dart` | Implementasikan ekspor CSV/PDF (atau sembunyikan tombol sementara) dan tambahkan aksi `Hapus Semua` dengan konfirmasi. |

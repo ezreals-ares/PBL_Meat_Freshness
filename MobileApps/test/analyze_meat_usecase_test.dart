@@ -49,10 +49,14 @@ class _FakeMeatClassifierRepository implements MeatClassifierRepository {
 
 class _FakeClassificationRepository implements ClassificationRepository {
   ClassificationResult? lastSaved;
+  Failure? saveFailureToReturn;
 
   @override
   Future<({ClassificationResult? result, Failure? failure})> save(
       ClassificationResult result) async {
+    if (saveFailureToReturn != null) {
+      return (result: null, failure: saveFailureToReturn);
+    }
     lastSaved = result.copyWith(id: 42);
     return (result: lastSaved, failure: null);
   }
@@ -185,5 +189,26 @@ void main() {
     expect(outcome.result, isNull);
     expect(outcome.failure, isA<ValidationFailure>());
     expect(fakeClassificationRepo.lastSaved, isNull);
+  });
+
+  test('AnalyzeMeatUseCase menghapus salinan gambar bila penyimpanan DB gagal',
+      () async {
+    fakeClassifier.nextOutput = const PredictionOutput(
+      label: 'fresh',
+      confidence: 0.91,
+      modelType: PredictionModelType.netv2,
+      probabilities: {'fresh': 0.91, 'half_fresh': 0.06, 'spoiled': 0.03},
+    );
+    fakeClassificationRepo.saveFailureToReturn =
+        const LocalFailure('Gagal menyimpan hasil klasifikasi.');
+
+    final outcome = await useCase(
+      sourceImagePath: '/tmp/camera.jpg',
+      modelType: PredictionModelType.netv2,
+    );
+
+    expect(outcome.result, isNull);
+    expect(outcome.failure, isA<LocalFailure>());
+    expect(fakeImageStorage.deletedPaths, ['/app_docs/scan_images/copied.jpg']);
   });
 }
