@@ -30,8 +30,12 @@ def _white_patch(img01: np.ndarray, pct: int = 98, limit: tuple[float, float] = 
     return np.clip(img01 * gain, 0, 1).astype(np.float32)
 
 
-def segment_meat(img01: np.ndarray) -> tuple[np.ndarray, bool]:
-    """Pisahkan area daging dari latar. Kembalikan (mask 0/1, apakah fallback seluruh gambar)."""
+def segment_meat_with_coverage(img01: np.ndarray) -> tuple[np.ndarray, bool, float]:
+    """Pisahkan area daging dari latar.
+
+    Mengembalikan `(mask 0/1, fallback, meat_coverage)` di mana `meat_coverage`
+    adalah rasio area daging [0.0, 1.0] sebelum fallback ke seluruh gambar.
+    """
     blur = cv2.GaussianBlur(_white_patch(img01), (K_BLUR, K_BLUR), 0)
     hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(blur, cv2.COLOR_BGR2Lab)
@@ -64,9 +68,16 @@ def segment_meat(img01: np.ndarray) -> tuple[np.ndarray, bool]:
         largest = opened
 
     filled = ndi.binary_fill_holes(largest > 0).astype(np.uint8)
-    if filled.mean() < MIN_COVER:
-        return np.ones(filled.shape, np.uint8), True
-    return filled, False
+    coverage = float(filled.mean())
+    if coverage < MIN_COVER:
+        return np.ones(filled.shape, np.uint8), True, coverage
+    return filled, False, coverage
+
+
+def segment_meat(img01: np.ndarray) -> tuple[np.ndarray, bool]:
+    """Pisahkan area daging dari latar. Kembalikan (mask 0/1, apakah fallback seluruh gambar)."""
+    mask, fallback, _ = segment_meat_with_coverage(img01)
+    return mask, fallback
 
 
 def _prop_hist(vals: np.ndarray, bins: int, rng: tuple[float, float]) -> np.ndarray:
@@ -134,12 +145,24 @@ def extract_features_lanjutan(img01: np.ndarray, mask: np.ndarray) -> np.ndarray
     return np.concatenate(parts)
 
 
-def preprocess_for_svm(image: Image.Image) -> tuple[np.ndarray, bool]:
-    """Siapkan foto -> (fitur 1x183, segmentation_fallback)."""
+def prepare_bgr_image(image: Image.Image) -> np.ndarray:
+    """Konversi PIL Image menjadi BGR float32 [0, 1] berukuran 224x224."""
     im = ImageOps.exif_transpose(image).convert("RGB")
     im.thumbnail((MAX_PHOTO_SIDE, MAX_PHOTO_SIDE), Image.Resampling.LANCZOS)
     img_u8 = cv2.resize(cv2.cvtColor(np.array(im), cv2.COLOR_RGB2BGR), IMG_SIZE)
-    img01 = img_u8.astype(np.float32) / 255.0
+    return img_u8.astype(np.float32) / 255.0
+
+
+def estimate_meat_coverage(image: Image.Image) -> tuple[float, bool]:
+    """Hitung estimasi cakupan area daging [0.0, 1.0] beserta status fallback segmentasi."""
+    img01 = prepare_bgr_image(image)
+    _, fallback, coverage = segment_meat_with_coverage(img01)
+    return coverage, fallback
+
+
+def preprocess_for_svm(image: Image.Image) -> tuple[np.ndarray, bool]:
+    """Siapkan foto -> (fitur 1x183, segmentation_fallback)."""
+    img01 = prepare_bgr_image(image)
     mask, fallback = segment_meat(img01)
     features = extract_features_lanjutan(img01, mask).reshape(1, -1)
     return features, fallback
@@ -150,6 +173,11 @@ class SVMClassifier:
 
     def __init__(self, model_path: Path):
         self.pipeline = joblib.load(model_path)
+
+    def predict_from_prepared(self, img01: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """Jalankan inferensi SVM dari gambar & mask yang sudah disiapkan."""
+        features = extract_features_lanjutan(img01, mask).reshape(1, -1)
+        return self.pipeline.predict_proba(features)[0]
 
     def predict(self, image: Image.Image) -> tuple[np.ndarray, bool]:
         features, fallback = preprocess_for_svm(image)

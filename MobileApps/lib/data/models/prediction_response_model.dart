@@ -12,6 +12,9 @@ class PredictionResponseModel {
   final double confidence;
   final Map<String, double> probabilities;
   final bool segmentationFallback;
+  final bool isMeat;
+  final String? reason;
+  final double? meatCoverage;
 
   const PredictionResponseModel({
     required this.model,
@@ -19,6 +22,9 @@ class PredictionResponseModel {
     required this.confidence,
     required this.probabilities,
     this.segmentationFallback = false,
+    this.isMeat = true,
+    this.reason,
+    this.meatCoverage,
   });
 
   /// Normalisasi label dari FastAPI (`half-fresh` -> `half_fresh`)
@@ -40,6 +46,7 @@ class PredictionResponseModel {
 
   factory PredictionResponseModel.fromJson(Map<String, dynamic> json) {
     final rawLabel = json['label'] as String? ?? '';
+    final normalizedLabel = normalizeLabel(rawLabel);
     final rawProbs = json['probabilities'] as Map<String, dynamic>? ?? const {};
 
     final normalizedProbs = <String, double>{};
@@ -50,12 +57,17 @@ class PredictionResponseModel {
       }
     }
 
+    final rawReason = (json['reason'] as String?)?.trim();
+
     return PredictionResponseModel(
       model: json['model'] as String? ?? 'netv2',
-      label: normalizeLabel(rawLabel),
+      label: normalizedLabel,
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
       probabilities: normalizedProbs,
       segmentationFallback: json['segmentation_fallback'] as bool? ?? false,
+      isMeat: json['is_meat'] as bool? ?? (normalizedLabel != 'non_meat'),
+      reason: (rawReason != null && rawReason.isNotEmpty) ? rawReason : null,
+      meatCoverage: (json['meat_coverage'] as num?)?.toDouble(),
     );
   }
 
@@ -67,6 +79,9 @@ class PredictionResponseModel {
       modelType: parseModelType(model),
       probabilities: Map<String, double>.unmodifiable(probabilities),
       segmentationFallback: segmentationFallback,
+      isMeat: isMeat,
+      rejectionReason: reason,
+      meatCoverage: meatCoverage,
     );
   }
 }

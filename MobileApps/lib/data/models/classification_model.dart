@@ -19,6 +19,8 @@ class ClassificationModel extends ClassificationResult {
     super.modelType,
     super.probabilities,
     super.segmentationFallback,
+    super.isMeat = true,
+    super.rejectionReason,
   });
 
   static String? _serializeModelType(PredictionModelType? type) {
@@ -111,6 +113,8 @@ class ClassificationModel extends ClassificationResult {
             ? Map<String, double>.unmodifiable(probabilities!)
             : null,
         segmentationFallback: segmentationFallback,
+        isMeat: isMeat,
+        rejectionReason: rejectionReason,
       );
 
   @override
@@ -124,6 +128,8 @@ class ClassificationModel extends ClassificationResult {
     PredictionModelType? modelType,
     Map<String, double>? probabilities,
     bool? segmentationFallback,
+    bool? isMeat,
+    String? rejectionReason,
   }) {
     return ClassificationModel(
       id: id ?? this.id,
@@ -135,6 +141,8 @@ class ClassificationModel extends ClassificationResult {
       modelType: modelType ?? this.modelType,
       probabilities: probabilities ?? this.probabilities,
       segmentationFallback: segmentationFallback ?? this.segmentationFallback,
+      isMeat: isMeat ?? this.isMeat,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
     );
   }
 }

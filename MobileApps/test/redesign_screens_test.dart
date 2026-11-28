@@ -169,6 +169,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('ResultScreen menampilkan kartu penolakan non-daging pada 360dp',
+      (WidgetTester tester) async {
+    setNarrowPhoneViewport(tester);
+
+    final nonMeatResult = ClassificationResult(
+      imagePath: '/nonexistent/meja.jpg',
+      result: 'non_meat',
+      confidence: 0.0,
+      createdAt: DateTime(2026, 11, 24, 20, 30),
+      modelType: PredictionModelType.svm,
+      isMeat: false,
+      rejectionReason: 'Objek daging tidak terdeteksi pada gambar.',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        home: ResultScreen(result: nonMeatResult),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('TIDAK DISIMPAN KE RIWAYAT'), findsOneWidget);
+    expect(find.text('OBJEK BUKAN DAGING'), findsOneWidget);
+    expect(find.text('Objek daging tidak terdeteksi pada gambar.'), findsOneWidget);
+    expect(find.text('AMBIL ULANG FOTO'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('HomeScreen & CaptureScreen standalone render bersih',
       (WidgetTester tester) async {
     setNarrowPhoneViewport(tester);

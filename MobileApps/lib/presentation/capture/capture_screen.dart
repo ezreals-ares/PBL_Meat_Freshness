@@ -119,7 +119,9 @@ class _CaptureScreenState extends State<CaptureScreen>
 
     if (scanProvider.scanState == ScanState.success &&
         scanProvider.currentResult != null) {
-      context.read<HistoryProvider>().loadHistory();
+      if (scanProvider.currentResult!.isMeat) {
+        context.read<HistoryProvider>().loadHistory();
+      }
       nav.pushReplacement(
         MaterialPageRoute(
           builder: (_) => ResultScreen(result: scanProvider.currentResult!),

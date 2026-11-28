@@ -46,9 +46,30 @@ class AnalyzeMeatUseCase {
       modelType: modelType,
     );
     if (prediction.failure != null) {
+      await _imageStorageRepository.deleteScanImage(stored.path!);
       return (result: null, failure: prediction.failure);
     }
     final output = prediction.output!;
+
+    // 2b. Jika bukan daging, hapus salinan permanen dan lewati penyimpanan SQLite
+    if (!output.isMeat || output.label == 'non_meat') {
+      await _imageStorageRepository.deleteScanImage(stored.path!);
+      return (
+        result: ClassificationResult(
+          imagePath: sourceImagePath,
+          result: 'non_meat',
+          confidence: output.confidence,
+          createdAt: DateTime.now(),
+          modelType: output.modelType,
+          probabilities:
+              output.probabilities.isNotEmpty ? output.probabilities : null,
+          segmentationFallback: output.segmentationFallback,
+          isMeat: false,
+          rejectionReason: output.rejectionReason,
+        ),
+        failure: null,
+      );
+    }
 
     // 3. Simpan ke riwayat
     final result = ClassificationResult(

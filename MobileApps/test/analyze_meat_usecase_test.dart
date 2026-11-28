@@ -10,6 +10,7 @@ import 'package:meatfresh_ai/domain/usecases/analyze_meat_usecase.dart';
 
 class _FakeImageStorageRepository implements ImageStorageRepository {
   Failure? failureToReturn;
+  final List<String> deletedPaths = [];
 
   @override
   Future<({String? path, Failure? failure})> saveScanImage(
@@ -18,6 +19,11 @@ class _FakeImageStorageRepository implements ImageStorageRepository {
       return (path: null, failure: failureToReturn);
     }
     return (path: '/app_docs/scan_images/copied.jpg', failure: null);
+  }
+
+  @override
+  Future<void> deleteScanImage(String imagePath) async {
+    deletedPaths.add(imagePath);
   }
 }
 
@@ -141,6 +147,32 @@ void main() {
     expect(outcome.failure, isA<NetworkFailure>());
     expect(outcome.failure?.message, 'Tidak dapat terhubung ke server.');
     expect(fakeClassificationRepo.lastSaved, isNull);
+    expect(fakeImageStorage.deletedPaths, ['/app_docs/scan_images/copied.jpg']);
+  });
+
+  test('AnalyzeMeatUseCase tidak menyimpan objek non-daging ke DB dan menghapus file salinan',
+      () async {
+    fakeClassifier.nextOutput = const PredictionOutput(
+      label: 'non_meat',
+      confidence: 0.0,
+      modelType: PredictionModelType.svm,
+      isMeat: false,
+      rejectionReason: 'Objek daging tidak terdeteksi.',
+      meatCoverage: 0.01,
+    );
+
+    final outcome = await useCase(
+      sourceImagePath: '/tmp/meja.jpg',
+      modelType: PredictionModelType.svm,
+    );
+
+    expect(outcome.failure, isNull);
+    expect(outcome.result?.isMeat, isFalse);
+    expect(outcome.result?.result, 'non_meat');
+    expect(outcome.result?.imagePath, '/tmp/meja.jpg');
+    expect(outcome.result?.rejectionReason, 'Objek daging tidak terdeteksi.');
+    expect(fakeClassificationRepo.lastSaved, isNull);
+    expect(fakeImageStorage.deletedPaths, ['/app_docs/scan_images/copied.jpg']);
   });
 
   test('AnalyzeMeatUseCase mengembalikan ValidationFailure jika path kosong',

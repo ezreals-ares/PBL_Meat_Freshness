@@ -45,5 +45,27 @@ void main() {
     expect(entity.label, 'spoiled');
     expect(entity.confidence, 0.91);
     expect(entity.segmentationFallback, isTrue);
+    expect(entity.isMeat, isTrue);
+    expect(entity.rejectionReason, isNull);
+  });
+
+  test('PredictionResponseModel.fromJson memetakan penolakan non-daging', () {
+    final json = {
+      'model': 'netv2',
+      'is_meat': false,
+      'label': 'non_meat',
+      'confidence': 0.0,
+      'probabilities': <String, dynamic>{},
+      'reason': 'Objek daging tidak terdeteksi pada gambar.',
+      'meat_coverage': 0.02,
+    };
+
+    final entity = PredictionResponseModel.fromJson(json).toEntity();
+
+    expect(entity.modelType, PredictionModelType.netv2);
+    expect(entity.isMeat, isFalse);
+    expect(entity.label, 'non_meat');
+    expect(entity.rejectionReason, 'Objek daging tidak terdeteksi pada gambar.');
+    expect(entity.meatCoverage, 0.02);
   });
 }
