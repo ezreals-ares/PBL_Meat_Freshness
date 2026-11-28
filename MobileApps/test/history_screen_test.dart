@@ -65,7 +65,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('HistoryScreen pencarian mendukung filter berdasarkan ID (#MF-12 & 12)',
+  testWidgets('HistoryScreen hanya menampilkan 4 chip filter tanpa search bar dan ikon filter',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -101,19 +101,38 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(TextField), findsNothing);
+    expect(find.byIcon(Icons.tune_rounded), findsNothing);
+    expect(find.text('SEMUA (2)'), findsOneWidget);
+    expect(find.text('SEGAR (1)'), findsOneWidget);
+    expect(find.text('SETENGAH SEGAR (0)'), findsOneWidget);
+    expect(find.text('BUSUK (1)'), findsOneWidget);
+
     expect(find.text('FRESH'), findsOneWidget);
     expect(find.text('SPOILED'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), '#MF-12');
+    await tester.tap(find.text('SEGAR (1)'));
     await tester.pumpAndSettle();
-
     expect(find.text('FRESH'), findsOneWidget);
     expect(find.text('SPOILED'), findsNothing);
 
-    await tester.enterText(find.byType(TextField), '99');
+    await tester.ensureVisible(find.text('BUSUK (1)'));
     await tester.pumpAndSettle();
-
+    await tester.tap(find.text('BUSUK (1)'));
+    await tester.pumpAndSettle();
     expect(find.text('FRESH'), findsNothing);
+    expect(find.text('SPOILED'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('SETENGAH SEGAR (0)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SETENGAH SEGAR (0)'));
+    await tester.pumpAndSettle();
+    expect(find.text('BELUM ADA CEK'), findsOneWidget);
+    expect(find.text('RESET FILTER'), findsOneWidget);
+
+    await tester.tap(find.text('RESET FILTER'));
+    await tester.pumpAndSettle();
+    expect(find.text('FRESH'), findsOneWidget);
     expect(find.text('SPOILED'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

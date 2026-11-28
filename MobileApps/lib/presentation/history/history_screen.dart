@@ -17,20 +17,12 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final _searchController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryProvider>().loadHistory();
     });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   void _deleteItem(BuildContext context, ClassificationResult item) {
@@ -95,8 +87,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           _buildHeader(context, items.length),
                           const SizedBox(height: AppSpacing.md),
-                          _buildSearchBar(context, provider),
-                          const SizedBox(height: 14),
                           _buildFilterChips(context, provider, items),
                           const SizedBox(height: AppSpacing.md),
                         ],
@@ -248,88 +238,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ─── SEARCH BAR ───────────────────────────────────────────
-  Widget _buildSearchBar(BuildContext context, HistoryProvider provider) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppColors.bgSurface,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-              border: Border.all(color: AppColors.borderSubtle, width: 1),
-              boxShadow: [AppShadows.softSm()],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.search_rounded,
-                  size: 20,
-                  color: AppColors.tertiaryDark,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (v) => provider.setSearchQuery(v),
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Cari jenis daging atau ID...',
-                      hintStyle: AppTextStyles.bodySm.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-                if (provider.searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      provider.setSearchQuery('');
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.cancel_rounded,
-                        size: 18,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.primarySoft,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.16),
-              width: 1,
-            ),
-          ),
-          child: const Icon(
-            Icons.tune_rounded,
-            size: 20,
-            color: AppColors.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
   // ─── FILTER CHIPS ─────────────────────────────────────────
   Widget _buildFilterChips(
     BuildContext context,
@@ -360,6 +268,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 15,
                   vertical: 9,
@@ -444,10 +353,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 18),
           PressableScale(
-            onTap: () {
-              context.read<HistoryProvider>().resetFilters();
-              _searchController.clear();
-            },
+            onTap: () => context.read<HistoryProvider>().resetFilters(),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
               decoration: BoxDecoration(

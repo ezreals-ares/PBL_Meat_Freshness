@@ -14,7 +14,6 @@ class HistoryProvider extends ChangeNotifier {
   List<ClassificationResult> _items = [];
   bool _isLoading = false;
   String _activeFilter = 'all';
-  String _searchQuery = '';
   String? _errorMessage;
 
   // ─── Getters ──────────────────────────────────────────────
@@ -22,29 +21,12 @@ class HistoryProvider extends ChangeNotifier {
   List<ClassificationResult> get items => _items;
   bool get isLoading => _isLoading;
   String get activeFilter => _activeFilter;
-  String get searchQuery => _searchQuery;
   String? get errorMessage => _errorMessage;
 
-  /// Items filtered by status and search query (mendukung nama, jenis daging, dan ID/#MF-ID).
+  /// Items filtered by freshness status.
   List<ClassificationResult> get filteredItems {
-    final query = _searchQuery.trim().toLowerCase();
-    return _items.where((item) {
-      final matchesFilter =
-          _activeFilter == 'all' || item.result == _activeFilter;
-      if (!matchesFilter) return false;
-      if (query.isEmpty) return true;
-
-      final id = item.id;
-      final matchesName = item.displayName.toLowerCase().contains(query);
-      final matchesMeat =
-          item.meatType?.toLowerCase().contains(query) ?? false;
-      final matchesId = id != null &&
-          (id.toString().contains(query) ||
-              'mf-$id'.contains(query) ||
-              '#mf-$id'.contains(query));
-
-      return matchesName || matchesMeat || matchesId;
-    }).toList();
+    if (_activeFilter == 'all') return List.unmodifiable(_items);
+    return _items.where((item) => item.result == _activeFilter).toList();
   }
 
   /// Count of each status for filter chips.
@@ -94,20 +76,15 @@ class HistoryProvider extends ChangeNotifier {
 
   /// Set the active filter.
   void setFilter(String filter) {
+    if (_activeFilter == filter) return;
     _activeFilter = filter;
     notifyListeners();
   }
 
-  /// Set the search query.
-  void setSearchQuery(String query) {
-    _searchQuery = query;
-    notifyListeners();
-  }
-
-  /// Clear search and filter.
+  /// Reset filter back to all.
   void resetFilters() {
+    if (_activeFilter == 'all') return;
     _activeFilter = 'all';
-    _searchQuery = '';
     notifyListeners();
   }
 }
