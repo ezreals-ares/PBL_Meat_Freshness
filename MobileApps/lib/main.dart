@@ -7,7 +7,9 @@ import 'data/api/meat_prediction_remote_datasource.dart';
 import 'data/db/classification_dao.dart';
 import 'data/repositories/local_image_storage_repository.dart';
 import 'data/repositories/remote_meat_classifier_repository.dart';
+import 'data/repositories/remote_server_health_repository.dart';
 import 'data/repositories/sqlite_classification_repository.dart';
+import 'domain/repositories/server_health_repository.dart';
 import 'domain/usecases/analyze_meat_usecase.dart';
 import 'presentation/providers/history_provider.dart';
 import 'presentation/providers/scan_provider.dart';
@@ -36,6 +38,9 @@ void main() {
   final classifierRepository = RemoteMeatClassifierRepository(
     remoteDataSource: remoteDataSource,
   );
+  final serverHealthRepository = RemoteServerHealthRepository(
+    remoteDataSource: remoteDataSource,
+  );
   const imageStorageRepository = LocalImageStorageRepository();
 
   final dao = ClassificationDao();
@@ -54,6 +59,7 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
+        Provider<ServerHealthRepository>.value(value: serverHealthRepository),
         ChangeNotifierProvider(
           create: (_) => ScanProvider(
             analyzeMeatUseCase: analyzeMeatUseCase,

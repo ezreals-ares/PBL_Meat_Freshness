@@ -9,6 +9,7 @@ import 'package:meatfresh_ai/data/api/api_endpoints.dart';
 import 'package:meatfresh_ai/data/api/dio_client.dart';
 import 'package:meatfresh_ai/data/api/meat_prediction_remote_datasource.dart';
 import 'package:meatfresh_ai/data/repositories/remote_meat_classifier_repository.dart';
+import 'package:meatfresh_ai/data/repositories/remote_server_health_repository.dart';
 import 'package:meatfresh_ai/domain/models/prediction_model_type.dart';
 
 class _FakeHttpClientAdapter implements HttpClientAdapter {
@@ -492,5 +493,59 @@ void main() {
 
     expect(outcome.output, isNull);
     expect(outcome.failure, isA<ServerFailure>());
+  });
+
+  test('RemoteServerHealthRepository mengembalikan latencyMs saat /health HTTP 200',
+      () async {
+    final adapter = _FakeHttpClientAdapter(
+      (_) => _jsonResponse({'status': 'ok'}, 200),
+    );
+    final dio = DioClient.create(baseUrl: 'https://example.test')
+      ..httpClientAdapter = adapter;
+    final repo = RemoteServerHealthRepository(
+      remoteDataSource: MeatPredictionRemoteDataSourceImpl(dio: dio),
+    );
+
+    final outcome = await repo.checkHealth();
+    expect(outcome.failure, isNull);
+    expect(outcome.latencyMs, isNotNull);
+    expect(outcome.latencyMs, greaterThanOrEqualTo(0));
+    expect(adapter.lastOptions?.path, '/health');
+    expect(adapter.lastOptions?.method, 'GET');
+  });
+
+  test('RemoteServerHealthRepository memetakan timeout ke NetworkFailure dan HTTP 503 ke ServerFailure',
+      () async {
+    final timeoutAdapter = _FakeHttpClientAdapter((options) {
+      throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.connectionTimeout,
+      );
+    });
+    final timeoutDio = DioClient.create(baseUrl: 'https://example.test')
+      ..httpClientAdapter = timeoutAdapter;
+    final timeoutRepo = RemoteServerHealthRepository(
+      remoteDataSource: MeatPredictionRemoteDataSourceImpl(dio: timeoutDio),
+    );
+
+    final timeoutOutcome = await timeoutRepo.checkHealth();
+    expect(timeoutOutcome.latencyMs, isNull);
+    expect(timeoutOutcome.failure, isA<NetworkFailure>());
+
+    final errorAdapter = _FakeHttpClientAdapter(
+      (_) => ResponseBody.fromString('Service Unavailable', 503),
+    );
+    final errorDio = DioClient.create(baseUrl: 'https://example.test')
+      ..httpClientAdapter = errorAdapter;
+    final errorRepo = RemoteServerHealthRepository(
+      remoteDataSource: MeatPredictionRemoteDataSourceImpl(dio: errorDio),
+    );
+
+    final errorOutcome = await errorRepo.checkHealth();
+    expect(errorOutcome.latencyMs, isNull);
+    expect(
+      errorOutcome.failure,
+      isA<ServerFailure>().having((f) => f.statusCode, 'statusCode', 503),
+    );
   });
 }
