@@ -5,9 +5,11 @@ import 'package:meatfresh_ai/data/api/dio_client.dart';
 import 'package:meatfresh_ai/data/api/meat_prediction_remote_datasource.dart';
 import 'package:meatfresh_ai/data/repositories/local_image_storage_repository.dart';
 import 'package:meatfresh_ai/data/repositories/remote_meat_classifier_repository.dart';
+import 'package:meatfresh_ai/data/repositories/remote_server_health_repository.dart';
 import 'package:meatfresh_ai/domain/models/classification_result.dart';
 import 'package:meatfresh_ai/domain/models/prediction_model_type.dart';
 import 'package:meatfresh_ai/domain/repositories/classification_repository.dart';
+import 'package:meatfresh_ai/domain/repositories/server_health_repository.dart';
 import 'package:meatfresh_ai/domain/usecases/analyze_meat_usecase.dart';
 import 'package:meatfresh_ai/presentation/capture/capture_screen.dart';
 import 'package:meatfresh_ai/presentation/home/home_screen.dart';
@@ -15,6 +17,7 @@ import 'package:meatfresh_ai/presentation/preview/preview_screen.dart';
 import 'package:meatfresh_ai/presentation/providers/history_provider.dart';
 import 'package:meatfresh_ai/presentation/providers/scan_provider.dart';
 import 'package:meatfresh_ai/presentation/result/result_screen.dart';
+import 'package:meatfresh_ai/presentation/result/widgets/result_image_preview.dart';
 import 'package:meatfresh_ai/presentation/shell_screen.dart';
 import 'package:meatfresh_ai/presentation/theme/theme.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +50,13 @@ ScanProvider _buildScanProvider() {
     classificationRepository: _StubClassificationRepository(),
   );
   return ScanProvider(analyzeMeatUseCase: useCase);
+}
+
+ServerHealthRepository _buildHealthRepository() {
+  final dio = DioClient.create(baseUrl: 'https://example.test');
+  return RemoteServerHealthRepository(
+    remoteDataSource: MeatPredictionRemoteDataSourceImpl(dio: dio),
+  );
 }
 
 void main() {
@@ -167,6 +177,19 @@ void main() {
     expect(find.text('PINDAI LAGI'), findsOneWidget);
     expect(find.text('SELESAI'), findsOneWidget);
     expect(tester.takeException(), isNull);
+
+    // Ketuk preview foto untuk membuka tampilan layar penuh (fullscreen)
+    await tester.ensureVisible(find.byType(ResultImagePreview));
+    await tester.tap(find.byType(ResultImagePreview));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(find.text('Cubit untuk perbesar gambar'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsNothing);
+    expect(find.text('HASIL PINDAI'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('ResultScreen menampilkan kartu penolakan non-daging pada 360dp',
@@ -258,6 +281,34 @@ void main() {
     await tester.tap(find.text('BERANDA'));
     await tester.pumpAndSettle();
     expect(find.text('MEATFRESH AI'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Tombol Pengaturan di Beranda membuka SettingsScreen',
+      (WidgetTester tester) async {
+    setNarrowPhoneViewport(tester);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<ServerHealthRepository>.value(
+            value: _buildHealthRepository(),
+          ),
+          ChangeNotifierProvider(create: (_) => _buildScanProvider()),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.settings_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PENGATURAN'), findsOneWidget);
+    expect(find.text('Preferensi Analisis AI'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
