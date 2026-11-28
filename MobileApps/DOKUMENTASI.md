@@ -195,7 +195,7 @@ Proyek ini mengikuti pola **Clean Architecture (Layer-first)** dengan arah depen
 │                   PRESENTATION LAYER                    │
 │                                                         │
 │  ShellScreen (Bottom Nav)                               │
-│  ├── HomeScreen                                         │
+│  ├── HomeScreen → SettingsScreen                        │
 │  ├── CaptureScreen → PreviewScreen → ResultScreen       │
 │  └── HistoryScreen                                      │
 │                                                         │
@@ -212,7 +212,8 @@ Proyek ini mengikuti pola **Clean Architecture (Layer-first)** dengan arah depen
 │             PredictionModelType                         │
 │  Kontrak  : ClassificationRepository,                   │
 │             MeatClassifierRepository,                   │
-│             ImageStorageRepository                      │
+│             ImageStorageRepository,                     │
+│             ServerHealthRepository                      │
 └────────────────────┬────────────────────────────────────┘
                      │ mengimplementasikan kontrak
 ┌────────────────────▼────────────────────────────────────┐
@@ -220,6 +221,7 @@ Proyek ini mengikuti pola **Clean Architecture (Layer-first)** dengan arah depen
 │                                                         │
 │  SqliteClassificationRepository → ClassificationDao → DB  │
 │  RemoteMeatClassifierRepository → RemoteDataSource → Dio│
+│  RemoteServerHealthRepository   → RemoteDataSource → Dio│
 │  LocalImageStorageRepository    → File Storage          │
 │  Models: ClassificationModel, PredictionResponseModel   │
 └─────────────────────────────────────────────────────────┘
@@ -253,8 +255,8 @@ File paling awal yang dieksekusi Flutter saat aplikasi dijalankan, sekaligus ber
 1. `WidgetsFlutterBinding.ensureInitialized()` — memastikan binding Flutter siap sebelum plugin digunakan.
 2. `SystemChrome.setPreferredOrientations([portraitUp])` — mengunci orientasi aplikasi ke **portrait**.
 3. `SystemChrome.setSystemUIOverlayStyle(...)` — membuat **status bar transparan** dengan ikon gelap.
-4. **Wiring DI terpusat:** merakit `DioClient.create()`, `MeatPredictionRemoteDataSourceImpl`, `RemoteMeatClassifierRepository`, `LocalImageStorageRepository`, `ClassificationDao`, `SqliteClassificationRepository`, dan `AnalyzeMeatUseCase`.
-5. `runApp(MultiProvider(...))` — menyuntikkan `ScanProvider` dan `HistoryProvider` ke widget tree.
+4. **Wiring DI terpusat:** merakit `DioClient.create()`, `MeatPredictionRemoteDataSourceImpl`, `RemoteMeatClassifierRepository`, `RemoteServerHealthRepository`, `LocalImageStorageRepository`, `ClassificationDao`, `SqliteClassificationRepository`, dan `AnalyzeMeatUseCase`.
+5. `runApp(MultiProvider(...))` — menyuntikkan `ServerHealthRepository`, `ScanProvider`, dan `HistoryProvider` ke widget tree.
 
 #### `lib/app.dart`
 
@@ -363,6 +365,10 @@ Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`).
 
 `RemoteMeatClassifierRepository` mengimplementasikan `MeatClassifierRepository`. Memetakan `PredictionModelType` secara *exhaustive* via `_endpointFor(modelType)` ke `ApiEndpoints.predictNetV2` / `ApiEndpoints.predictSvm`, mencatat error dengan `developer.log`, lalu menangkap `NetworkException` / `ImageProcessingException` / `AppException` menjadi `ServerFailure`, `NetworkFailure`, atau `LocalFailure`.
 
+#### `lib/data/repositories/remote_server_health_repository.dart`
+
+`RemoteServerHealthRepository` mengimplementasikan `ServerHealthRepository`. Mengukur waktu respons endpoint `/health` melalui `MeatPredictionRemoteDataSource.checkHealth()` menggunakan `Stopwatch` dan memetakan `NetworkException` / `AppException` menjadi `NetworkFailure` atau `ServerFailure`.
+
 #### `lib/data/repositories/local_image_storage_repository.dart`
 
 `LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Memeriksa eksistensi file sumber, menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<microseconds>_<seq>.ext` agar bebas bentrokan nama, menyediakan `deleteScanImage(imagePath)` untuk membersihkan salinan saat request gagal/non-daging/riwayat dihapus, dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
@@ -387,6 +393,7 @@ Entity hasil prediksi AI (`label`, `confidence`, `modelType`, `probabilities`, `
 - `classification_repository.dart` — kontrak `save`, `getAll`, `delete`, `deleteAll` berbasis `({..., Failure? failure})`.
 - `meat_classifier_repository.dart` — kontrak `classify({required imagePath, required modelType})`.
 - `image_storage_repository.dart` — kontrak `saveScanImage(sourcePath)` dan `deleteScanImage(imagePath)`.
+- `server_health_repository.dart` — kontrak `checkHealth()` berbasis `({int? latencyMs, Failure? failure})`.
 
 #### `lib/domain/usecases/analyze_meat_usecase.dart`
 
@@ -407,7 +414,7 @@ Mengelola state alur pindai (`idle → imageSelected → processing → success 
 
 #### `lib/presentation/providers/history_provider.dart`
 
-Mengelola state daftar riwayat (`items`, `filteredItems`, `activeFilter`, `isLoading`, `errorMessage`). Menerima `ClassificationRepository` via constructor DI dan memproses `Failure` tanpa `try-catch`.
+Mengelola state daftar riwayat (`items`, `filteredItems`, `activeFilter`, `isLoading`, `errorMessage`) beserta state seleksi hapus massal (`isSelectionMode`, `selectedIds`, `isAllFilteredSelected`, `toggleSelectAllFiltered()`, `deleteSelected()`, `deleteAll()`). Menerima `ClassificationRepository` via constructor DI dan memproses `Failure` tanpa `try-catch`.
 
 ---
 
@@ -566,9 +573,11 @@ Terletak di `lib/presentation/widgets/`:
 - [x] Error handling berbasis `Failure` + record (`NetworkFailure`, `ServerFailure`, `LocalFailure`, `ValidationFailure`)
 - [x] Use case bisnis `AnalyzeMeatUseCase` & injeksi dependensi terpusat di `main.dart`
 - [x] Database SQLite lokal (`meatfresh.db`) & sinkronisasi otomatis daftar riwayat setelah scan
-- [x] Sistem desain **Fresh Meat Culinary** & seluruh 5 layar UI (Home, Capture, Preview, Result, History)
-- [x] **UI pemilih model (`netv2` vs `svm`)** — pilihan model di `PreviewScreen` terhubung ke `ScanProvider.selectModel(...)`
-- [x] **Tampilan detail probabilitas & info SVM fallback** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v3, terindeks pada `created_at DESC`) dan ditampilkan di `ResultScreen` serta `HistoryScreen`
+- [x] Sistem desain **Fresh Meat Culinary** & seluruh 6 layar UI (Home, Capture, Preview, Result, History, Settings)
+- [x] **UI pemilih model (`netv2` vs `svm`)** — pilihan model di `PreviewScreen` dan **Preferensi Default** di `SettingsScreen` terhubung ke `ScanProvider.selectModel(...)`
+- [x] **Tampilan detail probabilitas, info SVM fallback, & fullscreen preview** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v3, terindeks pada `created_at DESC`) dan ditampilkan di `ResultScreen` serta `HistoryScreen`; foto hasil pindai mendukung ketuk untuk *fullscreen pinch-to-zoom*
+- [x] **Menu Pengaturan & status koneksi server** — `SettingsScreen` menyediakan pilihan model default, cek `/health` server AI, status/permintaan izin kamera & galeri, panduan foto, serta info aplikasi & disclaimer
+- [x] **Multi-select & hapus massal riwayat** — `HistoryScreen` mendukung mode **PILIH / PILIH SEMUA**, **BATAL**, **HAPUS TERPILIH**, dan **HAPUS SEMUA**
 - [x] **Validasi non-daging (Opsi C) & pembersihan *orphan image*** — `isMeat: false` ditolak di `ResultScreen` tanpa disimpan ke SQLite
 - [x] Unit & widget tests (`69/69` lulus) + E2E Appium (`AutomationTest/`, `4/4` spec lulus)
 - [x] Verifikasi `flutter analyze` bersih (`No issues found!`)
@@ -578,13 +587,12 @@ Terletak di `lib/presentation/widgets/`:
 #### Prioritas Sedang
 - [ ] **Izin kamera/storage eksplisit** — integrasi `permission_handler` di `CaptureScreen` sebelum memanggil `image_picker`
 - [ ] **Kolom `meat_type`** — UI untuk input jenis daging (ayam, sapi, kambing, dll.)
-- [ ] **Navigasi detail dari riwayat & fitur hapus semua** — lengkapi `onTap` item di `HistoryScreen` dan tombol `deleteAll()`
 - [ ] **Export riwayat** — fitur ekspor ke CSV atau PDF
 
 #### Prioritas Rendah
-- [ ] **Widget tests lanjutan** — test interaksi layar Capture, Preview, Result, dan History
+- [ ] **Widget tests lanjutan** — test interaksi penuh alur kamera/galeri `CaptureScreen`
 - [ ] **Onboarding screen** — panduan penggunaan pertama kali
-- [ ] **Pengaturan** — dark mode toggle, bahasa, ukuran font
+- [ ] **Pengaturan lanjutan** — dark mode toggle, bahasa, ukuran font
 
 ---
 
@@ -626,4 +634,4 @@ Terletak di `lib/presentation/widgets/`:
 ---
 
 *Dokumentasi ini diperbarui berdasarkan analisis source code proyek MeatFresh AI (`MobileApps/` & `FastAPI/`).*
-*Versi: 1.3.0 (FastAPI Auth + Non-Meat Validation + Fresh Meat Culinary UI) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*
+*Versi: 1.4.0 (SettingsScreen + History Batch Select/Delete + Fullscreen Result Preview) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*
