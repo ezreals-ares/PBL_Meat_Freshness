@@ -4,17 +4,31 @@ import 'package:path/path.dart';
 /// Singleton SQLite database helper.
 class DbHelper {
   static const String _dbName = 'meatfresh.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
   static const String tableClassifications = 'classifications';
+  static const String _idxCreatedAt = 'idx_classifications_created_at';
 
   DbHelper._();
   static final DbHelper instance = DbHelper._();
 
   Database? _db;
+  Future<Database>? _dbFuture;
 
   Future<Database> get database async {
-    _db ??= await _initDb();
-    return _db!;
+    final existing = _db;
+    if (existing != null && existing.isOpen) return existing;
+    if (existing != null) {
+      _db = null;
+      _dbFuture = null;
+    }
+    final pending = _dbFuture ??= _initDb();
+    try {
+      _db = await pending;
+      return _db!;
+    } catch (_) {
+      _dbFuture = null;
+      rethrow;
+    }
   }
 
   Future<Database> _initDb() async {
@@ -42,6 +56,10 @@ class DbHelper {
         segmentation_fallback INTEGER
       )
     ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS $_idxCreatedAt
+      ON $tableClassifications(created_at DESC)
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -53,14 +71,21 @@ class DbHelper {
       await db.execute(
           'ALTER TABLE $tableClassifications ADD COLUMN segmentation_fallback INTEGER');
     }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS $_idxCreatedAt
+        ON $tableClassifications(created_at DESC)
+      ''');
+    }
   }
 
   /// Close the database. Call on app dispose if needed.
   Future<void> close() async {
     final db = _db;
+    _db = null;
+    _dbFuture = null;
     if (db != null) {
       await db.close();
-      _db = null;
     }
   }
 }

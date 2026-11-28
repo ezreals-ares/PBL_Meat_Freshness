@@ -82,6 +82,10 @@ class AnalyzeMeatUseCase {
       segmentationFallback: output.segmentationFallback,
     );
 
-    return _classificationRepository.save(result);
+    final saved = await _classificationRepository.save(result);
+    if (saved.failure != null) {
+      await _imageStorageRepository.deleteScanImage(stored.path!);
+    }
+    return saved;
   }
 }

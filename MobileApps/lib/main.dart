@@ -5,9 +5,9 @@ import 'app.dart';
 import 'data/api/dio_client.dart';
 import 'data/api/meat_prediction_remote_datasource.dart';
 import 'data/db/classification_dao.dart';
-import 'data/repositories/classification_repository.dart';
 import 'data/repositories/local_image_storage_repository.dart';
 import 'data/repositories/remote_meat_classifier_repository.dart';
+import 'data/repositories/sqlite_classification_repository.dart';
 import 'domain/usecases/analyze_meat_usecase.dart';
 import 'presentation/providers/history_provider.dart';
 import 'presentation/providers/scan_provider.dart';
@@ -39,7 +39,10 @@ void main() {
   const imageStorageRepository = LocalImageStorageRepository();
 
   final dao = ClassificationDao();
-  final classificationRepository = ClassificationRepositoryImpl(dao: dao);
+  final classificationRepository = SqliteClassificationRepository(
+    dao: dao,
+    imageStorageRepository: imageStorageRepository,
+  );
 
   // Domain layer: use case menggabungkan abstraksi repository
   final analyzeMeatUseCase = AnalyzeMeatUseCase(

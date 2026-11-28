@@ -4,9 +4,9 @@ import 'package:meatfresh_ai/app.dart';
 import 'package:meatfresh_ai/data/api/dio_client.dart';
 import 'package:meatfresh_ai/data/api/meat_prediction_remote_datasource.dart';
 import 'package:meatfresh_ai/data/db/classification_dao.dart';
-import 'package:meatfresh_ai/data/repositories/classification_repository.dart';
 import 'package:meatfresh_ai/data/repositories/local_image_storage_repository.dart';
 import 'package:meatfresh_ai/data/repositories/remote_meat_classifier_repository.dart';
+import 'package:meatfresh_ai/data/repositories/sqlite_classification_repository.dart';
 import 'package:meatfresh_ai/domain/usecases/analyze_meat_usecase.dart';
 import 'package:meatfresh_ai/presentation/providers/history_provider.dart';
 import 'package:meatfresh_ai/presentation/providers/scan_provider.dart';
@@ -21,7 +21,10 @@ void main() {
     );
     const imageStorageRepository = LocalImageStorageRepository();
     final dao = ClassificationDao();
-    final classificationRepository = ClassificationRepositoryImpl(dao: dao);
+    final classificationRepository = SqliteClassificationRepository(
+      dao: dao,
+      imageStorageRepository: imageStorageRepository,
+    );
 
     final analyzeMeatUseCase = AnalyzeMeatUseCase(
       imageStorageRepository: imageStorageRepository,
