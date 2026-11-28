@@ -19,7 +19,7 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isNonMeat = !result.isMeat || result.result == 'non_meat';
+    final isNonMeat = result.isNonMeat;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,

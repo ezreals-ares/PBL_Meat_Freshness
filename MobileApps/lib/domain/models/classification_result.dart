@@ -1,3 +1,4 @@
+import '../../core/constants.dart';
 import 'prediction_model_type.dart';
 
 /// Domain entity untuk hasil klasifikasi kesegaran daging.
@@ -29,45 +30,24 @@ class ClassificationResult {
     this.rejectionReason,
   });
 
-  // ─── Display helpers (pure Dart) ───────────────────────────
+  // ─── Display & business helpers (pure Dart) ────────────────
+
+  /// Apakah hasil mengindikasikan objek bukan daging.
+  bool get isNonMeat => !isMeat || result == AppConstants.nonMeatLabel;
 
   /// Label status yang mudah dibaca.
-  String get displayName {
-    switch (result) {
-      case 'fresh':
-        return 'SEGAR';
-      case 'half_fresh':
-        return 'SETENGAH SEGAR';
-      case 'spoiled':
-        return 'BUSUK';
-      case 'non_meat':
-        return 'BUKAN DAGING';
-      default:
-        return result.toUpperCase();
-    }
-  }
-
-  /// Emoji prefix for accessibility.
-  String get statusEmoji {
-    switch (result) {
-      case 'fresh':
-        return '✅';
-      case 'half_fresh':
-        return '⚠️';
-      case 'spoiled':
-        return '⛔';
-      case 'non_meat':
-        return '🚫';
-      default:
-        return '❓';
-    }
-  }
+  String get displayName =>
+      AppConstants.labelDisplayNames[result] ?? result.toUpperCase();
 
   /// Whether the confidence is below the low-confidence threshold.
-  bool get isLowConfidence => confidence < 0.5;
+  bool get isLowConfidence =>
+      confidence.isNaN || confidence < AppConstants.lowConfidenceThreshold;
 
-  /// Confidence as a percentage string, e.g. "94.0%".
-  String get confidencePercent => '${(confidence * 100).toStringAsFixed(1)}%';
+  /// Confidence as a clamped percentage string, e.g. "94.0%".
+  String get confidencePercent {
+    final safe = confidence.isNaN ? 0.0 : confidence.clamp(0.0, 1.0);
+    return '${(safe * 100).toStringAsFixed(1)}%';
+  }
 
   /// Create a copy with updated fields.
   ClassificationResult copyWith({
@@ -96,5 +76,60 @@ class ClassificationResult {
       isMeat: isMeat ?? this.isMeat,
       rejectionReason: rejectionReason ?? this.rejectionReason,
     );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ClassificationResult &&
+        other.id == id &&
+        other.imagePath == imagePath &&
+        other.meatType == meatType &&
+        other.result == result &&
+        other.confidence == confidence &&
+        other.createdAt == createdAt &&
+        other.modelType == modelType &&
+        _mapsEqual(other.probabilities, probabilities) &&
+        other.segmentationFallback == segmentationFallback &&
+        other.isMeat == isMeat &&
+        other.rejectionReason == rejectionReason;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        imagePath,
+        meatType,
+        result,
+        confidence,
+        createdAt,
+        modelType,
+        _mapHash(probabilities),
+        segmentationFallback,
+        isMeat,
+        rejectionReason,
+      );
+
+  @override
+  String toString() {
+    return 'ClassificationResult(id: $id, result: $result, '
+        'confidence: $confidence, modelType: $modelType, isMeat: $isMeat)';
+  }
+
+  static bool _mapsEqual(Map<String, double>? a, Map<String, double>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null || a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static int _mapHash(Map<String, double>? map) {
+    if (map == null) return 0;
+    final keys = map.keys.toList()..sort();
+    return Object.hashAll(keys.map((k) => Object.hash(k, map[k])));
   }
 }

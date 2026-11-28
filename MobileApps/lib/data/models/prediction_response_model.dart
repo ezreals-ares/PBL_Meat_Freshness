@@ -1,3 +1,4 @@
+import '../../core/constants.dart';
 import '../../domain/models/prediction_model_type.dart';
 import '../../domain/models/prediction_output.dart';
 import '../errors/app_exceptions.dart';
@@ -80,8 +81,9 @@ class PredictionResponseModel {
       confidence: confidenceValue is num ? confidenceValue.toDouble() : 0.0,
       probabilities: normalizedProbs,
       segmentationFallback: fallbackValue is bool ? fallbackValue : false,
-      isMeat:
-          isMeatValue is bool ? isMeatValue : (normalizedLabel != 'non_meat'),
+      isMeat: isMeatValue is bool
+          ? isMeatValue
+          : (normalizedLabel != AppConstants.nonMeatLabel),
       reason: (rawReason != null && rawReason.isNotEmpty) ? rawReason : null,
       meatCoverage: coverageValue is num ? coverageValue.toDouble() : null,
     );

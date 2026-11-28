@@ -50,7 +50,7 @@ class VerdictCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${result.statusEmoji} ${result.displayName}',
+                      result.displayName,
                       style: AppTextStyles.headlineLgMobile.copyWith(
                         color: fg,
                         fontSize: 23,
