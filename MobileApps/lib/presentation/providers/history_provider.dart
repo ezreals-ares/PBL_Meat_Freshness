@@ -25,16 +25,25 @@ class HistoryProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get errorMessage => _errorMessage;
 
-  /// Items filtered by status and search query.
+  /// Items filtered by status and search query (mendukung nama, jenis daging, dan ID/#MF-ID).
   List<ClassificationResult> get filteredItems {
+    final query = _searchQuery.trim().toLowerCase();
     return _items.where((item) {
       final matchesFilter =
           _activeFilter == 'all' || item.result == _activeFilter;
-      final matchesSearch = _searchQuery.isEmpty ||
-          item.displayName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (item.meatType?.toLowerCase().contains(_searchQuery.toLowerCase()) ??
-              false);
-      return matchesFilter && matchesSearch;
+      if (!matchesFilter) return false;
+      if (query.isEmpty) return true;
+
+      final id = item.id;
+      final matchesName = item.displayName.toLowerCase().contains(query);
+      final matchesMeat =
+          item.meatType?.toLowerCase().contains(query) ?? false;
+      final matchesId = id != null &&
+          (id.toString().contains(query) ||
+              'mf-$id'.contains(query) ||
+              '#mf-$id'.contains(query));
+
+      return matchesName || matchesMeat || matchesId;
     }).toList();
   }
 

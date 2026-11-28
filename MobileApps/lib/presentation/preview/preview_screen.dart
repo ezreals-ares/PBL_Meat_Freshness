@@ -6,8 +6,10 @@ import '../../domain/models/prediction_model_type.dart';
 import '../providers/scan_provider.dart';
 import '../theme/result_ui_ext.dart';
 import '../theme/theme.dart';
+import '../widgets/curved_app_bar.dart';
+import '../widgets/pressable_scale.dart';
 
-class PreviewScreen extends StatefulWidget {
+class PreviewScreen extends StatelessWidget {
   final String imagePath;
   final VoidCallback onAnalyze;
 
@@ -18,11 +20,6 @@ class PreviewScreen extends StatefulWidget {
   });
 
   @override
-  State<PreviewScreen> createState() => _PreviewScreenState();
-}
-
-class _PreviewScreenState extends State<PreviewScreen> {
-  @override
   Widget build(BuildContext context) {
     final scanProvider = context.watch<ScanProvider>();
 
@@ -32,7 +29,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         backgroundColor: AppColors.bgCanvas,
         body: Column(
           children: [
-            _buildTopBar(),
+            _buildTopBar(context),
             // Ruang gambar yang bersih & luas
             Expanded(
               child: Padding(
@@ -54,9 +51,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       fit: StackFit.expand,
                       children: [
                         Image.file(
-                          File(widget.imagePath),
+                          File(imagePath),
                           fit: BoxFit.cover,
                           width: double.infinity,
+                          cacheWidth: 1080,
                           errorBuilder: (ctx, err, st) => Container(
                             color: AppColors.surfaceContainer,
                             child: const Center(
@@ -141,7 +139,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                         text:
                             'ANALISIS (${scanProvider.selectedModel.shortName})',
                         icon: Icons.science_rounded,
-                        onPressed: widget.onAnalyze,
+                        onPressed: onAnalyze,
                       ),
                       const SizedBox(height: 10),
                       _SecondaryGhostButton(
@@ -160,63 +158,21 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildTopBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.tertiary,
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(AppRadius.lg),
+  Widget _buildTopBar(BuildContext context) {
+    return CurvedAppBar(
+      title: 'PRATINJAU FOTO',
+      onBack: () => Navigator.of(context).pop(),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, AppSpacing.margin, 14),
-          child: Row(
-            children: [
-              Material(
-                color: Colors.white.withValues(alpha: 0.18),
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      Icons.arrow_back_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'PRATINJAU FOTO',
-                  style: AppTextStyles.headlineSm.copyWith(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-                child: Text(
-                  'SIAP PINDAI',
-                  style: AppTextStyles.labelSm.copyWith(
-                    color: Colors.white,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-            ],
+        child: Text(
+          'SIAP PINDAI',
+          style: AppTextStyles.labelSm.copyWith(
+            color: Colors.white,
+            fontSize: 10,
           ),
         ),
       ),
@@ -347,7 +303,7 @@ class _ModelOptionCard extends StatelessWidget {
   }
 }
 
-class _GoldenPrimaryButton extends StatefulWidget {
+class _GoldenPrimaryButton extends StatelessWidget {
   final String text;
   final IconData icon;
   final VoidCallback onPressed;
@@ -359,57 +315,42 @@ class _GoldenPrimaryButton extends StatefulWidget {
   });
 
   @override
-  State<_GoldenPrimaryButton> createState() => _GoldenPrimaryButtonState();
-}
-
-class _GoldenPrimaryButtonState extends State<_GoldenPrimaryButton> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        HapticFeedback.mediumImpact();
-        widget.onPressed();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 110),
-        child: Container(
-          height: 54,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            boxShadow: [AppShadows.glow(AppColors.accent, alpha: 0.35)],
-          ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(widget.icon, size: 20, color: AppColors.onAccent),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.text,
-                    style: AppTextStyles.labelLg.copyWith(
-                      color: AppColors.onAccent,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
+    return PressableScale(
+      pressedScale: 0.98,
+      mediumHaptic: true,
+      onTap: onPressed,
+      child: Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          boxShadow: [AppShadows.glow(AppColors.accent, alpha: 0.35)],
+        ),
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 20, color: AppColors.onAccent),
+                const SizedBox(width: 8),
+                Text(
+                  text,
+                  style: AppTextStyles.labelLg.copyWith(
                     color: AppColors.onAccent,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: AppColors.onAccent,
+                ),
+              ],
             ),
           ),
         ),
