@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import '../errors/app_exceptions.dart';
 import '../../core/failures.dart';
 import '../../domain/models/prediction_model_type.dart';
@@ -14,15 +16,17 @@ import '../api/meat_prediction_remote_datasource.dart';
 class RemoteMeatClassifierRepository implements MeatClassifierRepository {
   final MeatPredictionRemoteDataSource _remoteDataSource;
 
-  /// Pemetaan model domain -> endpoint API (detail API tetap di data layer).
-  static const Map<PredictionModelType, String> _endpointMap = {
-    PredictionModelType.netv2: ApiEndpoints.predictNetV2,
-    PredictionModelType.svm: ApiEndpoints.predictSvm,
-  };
-
   RemoteMeatClassifierRepository({
     required this._remoteDataSource,
   });
+
+  /// Pemetaan model domain -> endpoint API secara exhaustive.
+  static String _endpointFor(PredictionModelType modelType) {
+    return switch (modelType) {
+      PredictionModelType.netv2 => ApiEndpoints.predictNetV2,
+      PredictionModelType.svm => ApiEndpoints.predictSvm,
+    };
+  }
 
   @override
   Future<({PredictionOutput? output, Failure? failure})> classify({
@@ -31,20 +35,44 @@ class RemoteMeatClassifierRepository implements MeatClassifierRepository {
   }) async {
     try {
       final model = await _remoteDataSource.predict(
-        endpointPath: _endpointMap[modelType]!,
+        endpointPath: _endpointFor(modelType),
         imagePath: imagePath,
       );
       return (output: model.toEntity(), failure: null);
-    } on NetworkException catch (e) {
+    } on NetworkException catch (e, stackTrace) {
+      developer.log(
+        'Kegagalan jaringan/HTTP saat klasifikasi',
+        name: 'RemoteMeatClassifierRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
       final Failure failure = e.statusCode != null
           ? ServerFailure(e.message, statusCode: e.statusCode)
           : NetworkFailure(e.message);
       return (output: null, failure: failure);
-    } on ImageProcessingException catch (e) {
+    } on ImageProcessingException catch (e, stackTrace) {
+      developer.log(
+        'Kegagalan pemrosesan gambar lokal sebelum upload',
+        name: 'RemoteMeatClassifierRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return (output: null, failure: LocalFailure(e.message));
-    } on AppException catch (e) {
+    } on AppException catch (e, stackTrace) {
+      developer.log(
+        'Kegagalan inferensi/data layer',
+        name: 'RemoteMeatClassifierRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return (output: null, failure: ServerFailure(e.message));
-    } catch (_) {
+    } catch (e, stackTrace) {
+      developer.log(
+        'Kesalahan tak terduga saat klasifikasi',
+        name: 'RemoteMeatClassifierRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return (
         output: null,
         failure: const ServerFailure('Terjadi kesalahan saat memproses prediksi.'),

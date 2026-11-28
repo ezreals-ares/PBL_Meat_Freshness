@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../errors/app_exceptions.dart';
 import '../models/prediction_response_model.dart';
+import 'api_endpoints.dart';
 
 /// Kontrak remote data source untuk komunikasi HTTP dengan FastAPI.
 abstract class MeatPredictionRemoteDataSource {
@@ -26,12 +27,22 @@ class MeatPredictionRemoteDataSourceImpl
     required String endpointPath,
     required String imagePath,
   }) async {
-    final file = File(imagePath);
-    if (!await file.exists()) {
-      throw const ImageProcessingException('File gambar tidak ditemukan.');
-    }
-
     try {
+      final file = File(imagePath);
+      if (!await file.exists()) {
+        throw const ImageProcessingException('File gambar tidak ditemukan.');
+      }
+
+      final fileLength = await file.length();
+      if (fileLength == 0) {
+        throw const ImageProcessingException('File gambar kosong atau rusak.');
+      }
+      if (fileLength > ApiEndpoints.maxUploadBytes) {
+        throw const ImageProcessingException(
+          'Ukuran gambar terlalu besar (maksimal 10MB).',
+        );
+      }
+
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(imagePath),
       });
@@ -39,7 +50,6 @@ class MeatPredictionRemoteDataSourceImpl
       final response = await _dio.post<dynamic>(
         endpointPath,
         data: formData,
-        options: Options(contentType: 'multipart/form-data'),
       );
 
       final data = response.data;
@@ -50,6 +60,8 @@ class MeatPredictionRemoteDataSourceImpl
       return PredictionResponseModel.fromJson(data);
     } on AppException {
       rethrow;
+    } on FileSystemException catch (e) {
+      throw ImageProcessingException('Gagal membaca file gambar lokal.', e);
     } on DioException catch (e) {
       throw _mapDioException(e);
     } catch (e) {
@@ -108,8 +120,11 @@ class MeatPredictionRemoteDataSourceImpl
 
   String _extractErrorMessage(Response<dynamic>? response, int? statusCode) {
     final data = response?.data;
-    if (data is Map<String, dynamic> && data['detail'] is String) {
-      return data['detail'] as String;
+    if (data is Map<String, dynamic>) {
+      final detail = data['detail'];
+      if (detail is String && detail.trim().isNotEmpty) {
+        return detail.trim();
+      }
     }
 
     switch (statusCode) {

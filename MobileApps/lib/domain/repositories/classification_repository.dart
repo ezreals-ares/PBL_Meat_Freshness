@@ -6,7 +6,7 @@ import '../models/classification_result.dart';
 /// Domain mendefinisikan APA yang dibutuhkan — data layer yang
 /// mengimplementasikan BAGAIMANA. Error dikembalikan sebagai [Failure]
 /// di dalam record, tidak pernah dilempar sebagai exception.
-abstract class ClassificationRepository {
+abstract interface class ClassificationRepository {
   /// Simpan hasil klasifikasi. Berhasil → `result` berisi data dengan ID baru.
   Future<({ClassificationResult? result, Failure? failure})> save(
       ClassificationResult result);

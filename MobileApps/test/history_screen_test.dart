@@ -64,4 +64,57 @@ void main() {
     expect(find.text('NETV2'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('HistoryScreen pencarian mendukung filter berdasarkan ID (#MF-12 & 12)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final fakeRepo = _FakeClassificationRepository([
+      ClassificationResult(
+        id: 12,
+        imagePath: '/nonexistent/sample12.jpg',
+        result: 'fresh',
+        confidence: 0.95,
+        createdAt: DateTime(2026, 11, 20, 20, 45),
+        modelType: PredictionModelType.svm,
+      ),
+      ClassificationResult(
+        id: 99,
+        imagePath: '/nonexistent/sample99.jpg',
+        result: 'spoiled',
+        confidence: 0.88,
+        createdAt: DateTime(2026, 11, 20, 19, 10),
+        modelType: PredictionModelType.netv2,
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => HistoryProvider(repository: fakeRepo),
+        child: const MaterialApp(
+          home: HistoryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('SPOILED'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '#MF-12');
+    await tester.pumpAndSettle();
+
+    expect(find.text('FRESH'), findsOneWidget);
+    expect(find.text('SPOILED'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), '99');
+    await tester.pumpAndSettle();
+
+    expect(find.text('FRESH'), findsNothing);
+    expect(find.text('SPOILED'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

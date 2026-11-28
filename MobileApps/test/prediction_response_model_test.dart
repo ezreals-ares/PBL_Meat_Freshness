@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:meatfresh_ai/data/errors/app_exceptions.dart';
 import 'package:meatfresh_ai/data/models/prediction_response_model.dart';
 import 'package:meatfresh_ai/domain/models/prediction_model_type.dart';
 
@@ -67,5 +68,54 @@ void main() {
     expect(entity.label, 'non_meat');
     expect(entity.rejectionReason, 'Objek daging tidak terdeteksi pada gambar.');
     expect(entity.meatCoverage, 0.02);
+  });
+
+  test('PredictionResponseModel.fromJson melempar InferenceException bila label kosong atau hilang',
+      () {
+    expect(
+      () => PredictionResponseModel.fromJson(<String, dynamic>{}),
+      throwsA(isA<InferenceException>()),
+    );
+    expect(
+      () => PredictionResponseModel.fromJson({'label': '   ', 'confidence': 0.5}),
+      throwsA(isA<InferenceException>()),
+    );
+  });
+
+  test('PredictionResponseModel.fromJson menangani probabilities non-Map secara aman',
+      () {
+    final entity = PredictionResponseModel.fromJson({
+      'model': 'svm',
+      'label': 'fresh',
+      'confidence': 0.9,
+      'probabilities': ['invalid'],
+    }).toEntity();
+
+    expect(entity.modelType, PredictionModelType.svm);
+    expect(entity.label, 'fresh');
+    expect(entity.probabilities, isEmpty);
+  });
+
+  test('PredictionResponseModel.fromJson aman saat field opsional bertipe JSON tak terduga',
+      () {
+    final entity = PredictionResponseModel.fromJson({
+      'model': 42,
+      'label': 'half-fresh',
+      'confidence': 'bad',
+      'probabilities': {'fresh': 'invalid', 'half-fresh': 0.8},
+      'segmentation_fallback': 'yes',
+      'is_meat': 1,
+      'reason': 123,
+      'meat_coverage': 'low',
+    }).toEntity();
+
+    expect(entity.modelType, PredictionModelType.netv2);
+    expect(entity.label, 'half_fresh');
+    expect(entity.confidence, 0.0);
+    expect(entity.probabilities, {'half_fresh': 0.8});
+    expect(entity.segmentationFallback, isFalse);
+    expect(entity.isMeat, isTrue);
+    expect(entity.rejectionReason, isNull);
+    expect(entity.meatCoverage, isNull);
   });
 }

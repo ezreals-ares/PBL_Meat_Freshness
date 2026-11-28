@@ -3,7 +3,7 @@ import '../../core/failures.dart';
 /// Kontrak domain untuk penyimpanan file gambar pindai secara persisten.
 ///
 /// Memisahkan detail sistem file (`path_provider`, `dart:io`) dari domain dan presentation.
-abstract class ImageStorageRepository {
+abstract interface class ImageStorageRepository {
   /// Salin gambar ke penyimpanan privat aplikasi.
   /// Berhasil → `path` berisi lokasi baru; gagal → `failure` terisi.
   Future<({String? path, Failure? failure})> saveScanImage(String sourcePath);

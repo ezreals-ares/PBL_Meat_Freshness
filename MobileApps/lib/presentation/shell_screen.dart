@@ -19,11 +19,15 @@ class _ShellScreenState extends State<ShellScreen> {
 
   static const int _historyTabIndex = 2;
 
-  List<Widget> get _screens => [
-        HomeScreen(onNavigateToTab: _onTabSelected),
-        const CaptureScreen(),
-        const HistoryScreen(),
-      ];
+  late final Widget _homeScreen;
+  static const Widget _captureScreen = CaptureScreen();
+  static const Widget _historyScreen = HistoryScreen();
+
+  @override
+  void initState() {
+    super.initState();
+    _homeScreen = HomeScreen(onNavigateToTab: _onTabSelected);
+  }
 
   void _onTabSelected(int index) {
     if (index != _currentIndex) {
@@ -41,7 +45,14 @@ class _ShellScreenState extends State<ShellScreen> {
       backgroundColor: AppColors.bgCanvas,
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          _homeScreen,
+          TickerMode(
+            enabled: _currentIndex == 1,
+            child: _captureScreen,
+          ),
+          _historyScreen,
+        ],
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
