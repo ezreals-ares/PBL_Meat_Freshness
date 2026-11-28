@@ -6,7 +6,7 @@ import '../models/prediction_output.dart';
 ///
 /// Domain mendefinisikan APA yang dibutuhkan — data layer yang menentukan
 /// BAGAIMANA inferensi dijalankan (FastAPI via Dio atau implementasi lain).
-abstract class MeatClassifierRepository {
+abstract interface class MeatClassifierRepository {
   /// Klasifikasi gambar dengan [modelType].
   /// Berhasil → `output` terisi; gagal → `failure` terisi.
   Future<({PredictionOutput? output, Failure? failure})> classify({
