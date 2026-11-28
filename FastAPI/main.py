@@ -9,8 +9,14 @@ from ai_edge_litert.interpreter import Interpreter
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from meat_validator import validate_meat_coverage, validate_prediction_confidence
 from security import enforce_rate_limit, is_api_key_configured, verify_api_key
-from svm_pipeline import SVMClassifier
+from svm_pipeline import (
+    SVMClassifier,
+    estimate_meat_coverage,
+    prepare_bgr_image,
+    segment_meat_with_coverage,
+)
 
 logger = logging.getLogger("meat_freshness_api")
 
@@ -66,13 +72,49 @@ async def _read_uploaded_image(file: UploadFile) -> Image.Image:
         raise HTTPException(400, "File bukan gambar yang valid")
 
 
-def _format_prediction(model_name: str, probs: np.ndarray, **extra) -> dict:
+def _format_prediction(
+    model_name: str,
+    probs: np.ndarray,
+    *,
+    meat_coverage: float | None = None,
+    **extra,
+) -> dict:
     idx = int(np.argmax(probs))
     result = {
         "model": model_name,
+        "is_meat": True,
         "label": CLASS_NAMES[idx],
         "confidence": float(probs[idx]),
         "probabilities": {name: float(p) for name, p in zip(CLASS_NAMES, probs)},
+        "reason": None,
+    }
+    if meat_coverage is not None:
+        result["meat_coverage"] = round(float(meat_coverage), 4)
+    result.update(extra)
+    return result
+
+
+def _format_non_meat(
+    model_name: str,
+    reason: str | None,
+    meat_coverage: float,
+    probs: np.ndarray | None = None,
+    **extra,
+) -> dict:
+    confidence = float(np.max(probs)) if probs is not None and len(probs) > 0 else 0.0
+    probabilities = (
+        {name: float(p) for name, p in zip(CLASS_NAMES, probs)}
+        if probs is not None and len(probs) == len(CLASS_NAMES)
+        else {}
+    )
+    result = {
+        "model": model_name,
+        "is_meat": False,
+        "label": "non_meat",
+        "confidence": confidence,
+        "probabilities": probabilities,
+        "reason": reason,
+        "meat_coverage": round(float(meat_coverage), 4),
     }
     result.update(extra)
     return result
@@ -111,8 +153,17 @@ def health():
 )
 async def predict_netv2(file: UploadFile = File(...)):
     image = await _read_uploaded_image(file)
+    meat_coverage, _ = estimate_meat_coverage(image)
+    cov_ok, cov_reason = validate_meat_coverage(meat_coverage)
+    if not cov_ok:
+        return _format_non_meat("netv2", cov_reason, meat_coverage)
+
     probs = app.state.netv2.predict(image)
-    return _format_prediction("netv2", probs)
+    conf_ok, conf_reason = validate_prediction_confidence(probs)
+    if not conf_ok:
+        return _format_non_meat("netv2", conf_reason, meat_coverage, probs=probs)
+
+    return _format_prediction("netv2", probs, meat_coverage=meat_coverage)
 
 
 @app.post(
@@ -121,5 +172,35 @@ async def predict_netv2(file: UploadFile = File(...)):
 )
 async def predict_svm(file: UploadFile = File(...)):
     image = await _read_uploaded_image(file)
-    probs, fallback = app.state.svm.predict(image)
-    return _format_prediction("svm", probs, segmentation_fallback=fallback)
+    img01 = prepare_bgr_image(image)
+    mask, fallback, meat_coverage = segment_meat_with_coverage(img01)
+    cov_ok, cov_reason = validate_meat_coverage(meat_coverage)
+    if not cov_ok:
+        return _format_non_meat(
+            "svm",
+            cov_reason,
+            meat_coverage,
+            segmentation_fallback=fallback,
+        )
+
+    if hasattr(app.state.svm, "predict_from_prepared"):
+        probs = app.state.svm.predict_from_prepared(img01, mask)
+    else:
+        probs, fallback = app.state.svm.predict(image)
+
+    conf_ok, conf_reason = validate_prediction_confidence(probs)
+    if not conf_ok:
+        return _format_non_meat(
+            "svm",
+            conf_reason,
+            meat_coverage,
+            probs=probs,
+            segmentation_fallback=fallback,
+        )
+
+    return _format_prediction(
+        "svm",
+        probs,
+        meat_coverage=meat_coverage,
+        segmentation_fallback=fallback,
+    )
