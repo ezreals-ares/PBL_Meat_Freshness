@@ -306,4 +306,37 @@ void main() {
           ),
     );
   });
+
+  test('RemoteMeatClassifierRepository memetakan respons HTTP 200 non-daging ke PredictionOutput',
+      () async {
+    final adapter = _FakeHttpClientAdapter(
+      (_) => _jsonResponse({
+        'model': 'svm',
+        'is_meat': false,
+        'label': 'non_meat',
+        'confidence': 0.0,
+        'probabilities': <String, dynamic>{},
+        'reason': 'Objek daging tidak terdeteksi pada gambar.',
+        'meat_coverage': 0.02,
+      }, 200),
+    );
+    final dio = DioClient.create(baseUrl: 'https://example.test')
+      ..httpClientAdapter = adapter;
+    final repo = RemoteMeatClassifierRepository(
+      remoteDataSource: MeatPredictionRemoteDataSourceImpl(dio: dio),
+    );
+
+    final outcome = await repo.classify(
+      imagePath: tempImage.path,
+      modelType: PredictionModelType.svm,
+    );
+
+    expect(outcome.failure, isNull);
+    expect(outcome.output?.isMeat, isFalse);
+    expect(outcome.output?.label, 'non_meat');
+    expect(
+      outcome.output?.rejectionReason,
+      'Objek daging tidak terdeteksi pada gambar.',
+    );
+  });
 }

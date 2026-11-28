@@ -6,12 +6,14 @@ class ClassificationResult {
   final int? id;
   final String imagePath;
   final String? meatType;
-  final String result; // 'fresh' | 'half_fresh' | 'spoiled'
+  final String result; // 'fresh' | 'half_fresh' | 'spoiled' | 'non_meat'
   final double confidence; // 0.0 - 1.0
   final DateTime createdAt;
   final PredictionModelType? modelType;
   final Map<String, double>? probabilities;
   final bool? segmentationFallback;
+  final bool isMeat;
+  final String? rejectionReason;
 
   const ClassificationResult({
     this.id,
@@ -23,6 +25,8 @@ class ClassificationResult {
     this.modelType,
     this.probabilities,
     this.segmentationFallback,
+    this.isMeat = true,
+    this.rejectionReason,
   });
 
   // ─── Display helpers (pure Dart) ───────────────────────────
@@ -36,6 +40,8 @@ class ClassificationResult {
         return 'SETENGAH SEGAR';
       case 'spoiled':
         return 'BUSUK';
+      case 'non_meat':
+        return 'BUKAN DAGING';
       default:
         return result.toUpperCase();
     }
@@ -50,6 +56,8 @@ class ClassificationResult {
         return '⚠️';
       case 'spoiled':
         return '⛔';
+      case 'non_meat':
+        return '🚫';
       default:
         return '❓';
     }
@@ -72,6 +80,8 @@ class ClassificationResult {
     PredictionModelType? modelType,
     Map<String, double>? probabilities,
     bool? segmentationFallback,
+    bool? isMeat,
+    String? rejectionReason,
   }) {
     return ClassificationResult(
       id: id ?? this.id,
@@ -83,6 +93,8 @@ class ClassificationResult {
       modelType: modelType ?? this.modelType,
       probabilities: probabilities ?? this.probabilities,
       segmentationFallback: segmentationFallback ?? this.segmentationFallback,
+      isMeat: isMeat ?? this.isMeat,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
     );
   }
 }

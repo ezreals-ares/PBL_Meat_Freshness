@@ -43,4 +43,16 @@ class LocalImageStorageRepository implements ImageStorageRepository {
       );
     }
   }
+
+  @override
+  Future<void> deleteScanImage(String imagePath) async {
+    try {
+      final file = File(imagePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Abaikan kegagalan penghapusan sementara agar tidak menutupi hasil utama.
+    }
+  }
 }

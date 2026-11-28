@@ -53,6 +53,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return AppColors.statusHalf;
       case 'spoiled':
         return AppColors.statusSpoiled;
+      case 'non_meat':
+        return AppColors.tertiary;
       default:
         return AppColors.tertiary;
     }
@@ -67,6 +69,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return AppColors.statusHalfSoft;
       case 'spoiled':
         return AppColors.statusSpoiledSoft;
+      case 'non_meat':
+        return AppColors.tertiaryFixed;
       default:
         return AppColors.surfaceContainer;
     }
@@ -81,6 +85,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return AppColors.onAccent;
       case 'spoiled':
         return AppColors.onError;
+      case 'non_meat':
+        return AppColors.onTertiary;
       default:
         return AppColors.onPrimary;
     }
@@ -95,6 +101,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return AppColors.amberInk;
       case 'spoiled':
         return AppColors.statusSpoiledInk;
+      case 'non_meat':
+        return AppColors.tertiaryDark;
       default:
         return AppColors.textPrimary;
     }
@@ -109,6 +117,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return Icons.warning_amber_rounded;
       case 'spoiled':
         return Icons.dangerous_rounded;
+      case 'non_meat':
+        return Icons.image_not_supported_rounded;
       default:
         return Icons.help_outline_rounded;
     }
@@ -123,6 +133,8 @@ extension ClassificationResultUiExt on ClassificationResult {
         return 'Kesegaran mulai menurun. Segera masak hingga matang sempurna dan cek aroma.';
       case 'spoiled':
         return 'Indikasi pembusukan terdeteksi. Sebaiknya tidak dikonsumsi demi keamanan pangan.';
+      case 'non_meat':
+        return 'Objek pada foto tidak teridentifikasi sebagai daging. Ambil ulang foto tepat pada permukaan daging.';
       default:
         return 'Periksa kembali kondisi fisik dan aroma daging sebelum diolah.';
     }
