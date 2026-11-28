@@ -11,27 +11,42 @@ class HistoryCard extends StatelessWidget {
   final ClassificationResult item;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final VoidCallback? onLongPress;
 
   const HistoryCard({
     super.key,
     required this.item,
     required this.onTap,
     required this.onDelete,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     final timeStr = formatScanTimestamp(item.createdAt);
     final statusColor = item.statusColor;
+    final highlightSelected = isSelectionMode && isSelected;
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      onLongPress: onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.bgSurface,
+          color: highlightSelected
+              ? AppColors.primarySoft.withValues(alpha: 0.45)
+              : AppColors.bgSurface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.borderSubtle, width: 1),
+          border: Border.all(
+            color: highlightSelected ? AppColors.primary : AppColors.borderSubtle,
+            width: highlightSelected ? 1.5 : 1,
+          ),
           boxShadow: [AppShadows.softSm()],
         ),
         child: Row(
@@ -159,23 +174,42 @@ class HistoryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Tombol hapus ramah sentuh (>= 42x42)
-            Material(
-              color: AppColors.statusSpoiledSoft,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                onTap: onDelete,
-                child: const SizedBox(
-                  width: 42,
-                  height: 42,
-                  child: Icon(
-                    Icons.delete_outline_rounded,
-                    size: 20,
-                    color: AppColors.statusSpoiled,
-                  ),
-                ),
-              ),
+            // Mode pilih: indikator centang; mode normal: tombol hapus ramah sentuh (>= 42x42)
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: isSelectionMode
+                  ? SizedBox(
+                      key: ValueKey<bool>(isSelected),
+                      width: 42,
+                      height: 42,
+                      child: Icon(
+                        isSelected
+                            ? Icons.check_circle_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        size: 24,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textTertiary,
+                      ),
+                    )
+                  : Material(
+                      key: const ValueKey<String>('delete_action'),
+                      color: AppColors.statusSpoiledSoft,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        onTap: onDelete,
+                        child: const SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 20,
+                            color: AppColors.statusSpoiled,
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
