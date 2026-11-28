@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../../domain/models/classification_result.dart';
 import '../../domain/models/prediction_model_type.dart';
-import 'prediction_response_model.dart';
+import 'model_type_codec.dart';
 
 /// Data model yang memperluas [ClassificationResult] dengan serialisasi SQLite
 /// (`toMap` / `fromMap`) dan konversi ke entity murni (`toEntity`).
@@ -23,17 +23,6 @@ class ClassificationModel extends ClassificationResult {
     super.rejectionReason,
   });
 
-  static String? _serializeModelType(PredictionModelType? type) {
-    switch (type) {
-      case PredictionModelType.netv2:
-        return 'netv2';
-      case PredictionModelType.svm:
-        return 'svm';
-      case null:
-        return null;
-    }
-  }
-
   // ─── SQLite serialization ─────────────────────────────────
 
   /// Konversi ke Map untuk disimpan ke SQLite.
@@ -44,28 +33,38 @@ class ClassificationModel extends ClassificationResult {
         'result': result,
         'confidence': confidence,
         'created_at': createdAt.toIso8601String(),
-        'model_used': _serializeModelType(modelType),
+        'model_used': ModelTypeCodec.encode(modelType),
         'probabilities_json':
             probabilities != null ? jsonEncode(probabilities) : null,
         'segmentation_fallback':
             segmentationFallback == null ? null : (segmentationFallback! ? 1 : 0),
       };
 
-  /// Parsing dari baris SQLite ke [ClassificationModel].
+  /// Parsing dari baris SQLite ke [ClassificationModel] secara defensif.
   factory ClassificationModel.fromMap(Map<String, dynamic> map) {
-    final rawModel = map['model_used'] as String?;
-    final PredictionModelType? parsedModelType = rawModel != null
-        ? PredictionResponseModel.parseModelType(rawModel)
-        : null;
+    final parsedModelType =
+        ModelTypeCodec.tryParse(map['model_used'] as String?);
 
     Map<String, double>? parsedProbs;
     final rawJson = map['probabilities_json'] as String?;
     if (rawJson != null && rawJson.isNotEmpty) {
-      final decoded = jsonDecode(rawJson);
-      if (decoded is Map<String, dynamic>) {
-        parsedProbs = decoded.map(
-          (key, value) => MapEntry(key, (value as num).toDouble()),
-        );
+      try {
+        final decoded = jsonDecode(rawJson);
+        if (decoded is Map) {
+          final safeMap = <String, double>{};
+          for (final entry in decoded.entries) {
+            final key = entry.key;
+            final value = entry.value;
+            if (key is String && value is num) {
+              safeMap[key] = value.toDouble();
+            }
+          }
+          if (safeMap.isNotEmpty) {
+            parsedProbs = safeMap;
+          }
+        }
+      } catch (_) {
+        parsedProbs = null;
       }
     }
 
@@ -73,13 +72,19 @@ class ClassificationModel extends ClassificationResult {
     final bool? parsedFallback =
         rawFallback == null ? null : (rawFallback == 1 || rawFallback == true);
 
+    final rawCreatedAt = map['created_at'] as String?;
+    final parsedCreatedAt = rawCreatedAt != null
+        ? (DateTime.tryParse(rawCreatedAt) ??
+            DateTime.fromMillisecondsSinceEpoch(0))
+        : DateTime.fromMillisecondsSinceEpoch(0);
+
     return ClassificationModel(
       id: map['id'] as int?,
-      imagePath: map['image_path'] as String,
+      imagePath: map['image_path'] as String? ?? '',
       meatType: map['meat_type'] as String?,
-      result: map['result'] as String,
-      confidence: (map['confidence'] as num).toDouble(),
-      createdAt: DateTime.parse(map['created_at'] as String),
+      result: map['result'] as String? ?? '',
+      confidence: (map['confidence'] as num?)?.toDouble() ?? 0.0,
+      createdAt: parsedCreatedAt,
       modelType: parsedModelType,
       probabilities: parsedProbs,
       segmentationFallback: parsedFallback,
@@ -98,6 +103,8 @@ class ClassificationModel extends ClassificationResult {
         modelType: entity.modelType,
         probabilities: entity.probabilities,
         segmentationFallback: entity.segmentationFallback,
+        isMeat: entity.isMeat,
+        rejectionReason: entity.rejectionReason,
       );
 
   /// Konversi ke domain entity murni.

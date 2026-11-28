@@ -1,5 +1,7 @@
 import '../../domain/models/prediction_model_type.dart';
 import '../../domain/models/prediction_output.dart';
+import '../errors/app_exceptions.dart';
+import 'model_type_codec.dart';
 
 /// Data model untuk mem-parsing JSON response dari endpoint FastAPI
 /// (`/predict/netv2` dan `/predict/svm`).
@@ -35,39 +37,53 @@ class PredictionResponseModel {
 
   /// Pemetaan string `model` dari API ke enum domain.
   static PredictionModelType parseModelType(String? value) {
-    switch (value?.toLowerCase()) {
-      case 'svm':
-        return PredictionModelType.svm;
-      case 'netv2':
-      default:
-        return PredictionModelType.netv2;
-    }
+    return ModelTypeCodec.tryParse(value) ?? PredictionModelType.netv2;
   }
 
   factory PredictionResponseModel.fromJson(Map<String, dynamic> json) {
-    final rawLabel = json['label'] as String? ?? '';
+    final rawLabel = json['label'];
+    if (rawLabel is! String || rawLabel.trim().isEmpty) {
+      throw const InferenceException(
+        'Format respons server tidak valid: label prediksi kosong.',
+      );
+    }
+
     final normalizedLabel = normalizeLabel(rawLabel);
-    final rawProbs = json['probabilities'] as Map<String, dynamic>? ?? const {};
+    final rawProbs = json['probabilities'];
 
     final normalizedProbs = <String, double>{};
-    for (final entry in rawProbs.entries) {
-      final value = entry.value;
-      if (value is num) {
-        normalizedProbs[normalizeLabel(entry.key)] = value.toDouble();
+    if (rawProbs is Map) {
+      for (final entry in rawProbs.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (key is String && value is num) {
+          normalizedProbs[normalizeLabel(key)] = value.toDouble();
+        }
       }
     }
 
-    final rawReason = (json['reason'] as String?)?.trim();
+    final rawModel = json['model'];
+    final modelName = (rawModel is String && rawModel.trim().isNotEmpty)
+        ? rawModel.trim()
+        : 'netv2';
+    final rawReasonValue = json['reason'];
+    final rawReason =
+        rawReasonValue is String ? rawReasonValue.trim() : null;
+    final confidenceValue = json['confidence'];
+    final fallbackValue = json['segmentation_fallback'];
+    final isMeatValue = json['is_meat'];
+    final coverageValue = json['meat_coverage'];
 
     return PredictionResponseModel(
-      model: json['model'] as String? ?? 'netv2',
+      model: modelName,
       label: normalizedLabel,
-      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+      confidence: confidenceValue is num ? confidenceValue.toDouble() : 0.0,
       probabilities: normalizedProbs,
-      segmentationFallback: json['segmentation_fallback'] as bool? ?? false,
-      isMeat: json['is_meat'] as bool? ?? (normalizedLabel != 'non_meat'),
+      segmentationFallback: fallbackValue is bool ? fallbackValue : false,
+      isMeat:
+          isMeatValue is bool ? isMeatValue : (normalizedLabel != 'non_meat'),
       reason: (rawReason != null && rawReason.isNotEmpty) ? rawReason : null,
-      meatCoverage: (json['meat_coverage'] as num?)?.toDouble(),
+      meatCoverage: coverageValue is num ? coverageValue.toDouble() : null,
     );
   }
 
