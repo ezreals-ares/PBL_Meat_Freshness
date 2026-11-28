@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,8 @@ import '../../domain/repositories/image_storage_repository.dart';
 /// [getDocumentsDirectory] dapat disuntikkan saat testing agar tidak
 /// bergantung pada platform channel `path_provider`.
 class LocalImageStorageRepository implements ImageStorageRepository {
+  static int _sequence = 0;
+
   final Future<Directory> Function() _getDocumentsDirectory;
 
   const LocalImageStorageRepository({
@@ -21,21 +24,35 @@ class LocalImageStorageRepository implements ImageStorageRepository {
   Future<({String? path, Failure? failure})> saveScanImage(
       String sourcePath) async {
     try {
+      final sourceFile = File(sourcePath);
+      if (!await sourceFile.exists()) {
+        return (
+          path: null,
+          failure: const LocalFailure('File gambar sumber tidak ditemukan.'),
+        );
+      }
+
       final appDir = await _getDocumentsDirectory();
       final imagesDir = Directory(p.join(appDir.path, 'scan_images'));
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
       }
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final ext = p.extension(sourcePath).isNotEmpty
-          ? p.extension(sourcePath)
-          : '.jpg';
-      final destPath = p.join(imagesDir.path, 'scan_$timestamp$ext');
+      final timestamp = DateTime.now().microsecondsSinceEpoch;
+      final seq = _sequence++;
+      final rawExt = p.extension(sourcePath);
+      final ext = rawExt.isNotEmpty ? rawExt : '.jpg';
+      final destPath = p.join(imagesDir.path, 'scan_${timestamp}_$seq$ext');
 
-      await File(sourcePath).copy(destPath);
+      await sourceFile.copy(destPath);
       return (path: destPath, failure: null);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      developer.log(
+        'Gagal menyalin gambar ke penyimpanan lokal',
+        name: 'LocalImageStorageRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return (
         path: null,
         failure: const LocalFailure(
@@ -51,8 +68,13 @@ class LocalImageStorageRepository implements ImageStorageRepository {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {
-      // Abaikan kegagalan penghapusan sementara agar tidak menutupi hasil utama.
+    } catch (e, stackTrace) {
+      developer.log(
+        'Gagal menghapus file gambar sementara ($imagePath)',
+        name: 'LocalImageStorageRepository',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 }

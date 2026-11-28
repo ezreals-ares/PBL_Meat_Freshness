@@ -14,6 +14,14 @@ class DioClient {
     String apiKey = ApiEndpoints.apiKey,
     Duration timeout = ApiEndpoints.timeout,
   }) {
+    if (timeout <= Duration.zero) {
+      throw ArgumentError.value(
+        timeout,
+        'timeout',
+        'Timeout API harus lebih besar dari 0 detik.',
+      );
+    }
+
     final normalizedBaseUrl =
         ApiEndpoints.normalizeAndValidateBaseUrl(baseUrl);
     final trimmedKey = apiKey.trim();
