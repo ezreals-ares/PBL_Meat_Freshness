@@ -1,6 +1,6 @@
 # 🥩 MeatFresh AI — Dokumentasi Proyek Lengkap
 
-> Aplikasi Flutter untuk **deteksi kesegaran daging** menggunakan kamera & API FastAPI (MobileNetV2 & SVM), dengan antarmuka bergaya **Neobrutalism** dan arsitektur **Clean Architecture + SOLID**.
+> Aplikasi Flutter untuk **deteksi kesegaran daging** menggunakan kamera & API FastAPI (MobileNetV2 & SVM), dengan antarmuka **Modern Soft-Elevated (Fresh Meat Culinary)** dan arsitektur **Clean Architecture + SOLID**.
 
 ---
 
@@ -24,7 +24,7 @@
    - [Tests](#-tests)
 6. [Alur Kerja Aplikasi](#6-alur-kerja-aplikasi)
 7. [Database Schema](#7-database-schema)
-8. [Sistem Desain Neobrutalism](#8-sistem-desain-neobrutalism)
+8. [Sistem Desain (Fresh Meat Culinary)](#8-sistem-desain-fresh-meat-culinary)
 9. [Refactor Clean Architecture, SOLID & Integrasi API](#9-refactor-clean-architecture-solid--integrasi-api)
 10. [Status Pengembangan & TODO](#10-status-pengembangan--todo)
 11. [Audit Kelayakan Produksi & Rencana Perbaikan](#11-audit-kelayakan-produksi--rencana-perbaikan)
@@ -33,15 +33,16 @@
 
 ## 1. Gambaran Umum Aplikasi
 
-**MeatFresh AI** adalah aplikasi mobile berbasis Flutter yang membantu pengguna mendeteksi kesegaran daging secara visual menggunakan kamera atau galeri smartphone. Gambar dikirim ke backend **FastAPI** (`/predict/netv2` atau `/predict/svm`) untuk diklasifikasikan ke dalam tiga kategori:
+**MeatFresh AI** adalah aplikasi mobile berbasis Flutter yang membantu pengguna mendeteksi kesegaran daging secara visual menggunakan kamera atau galeri smartphone. Gambar dikirim ke backend **FastAPI** (`/predict/netv2` atau `/predict/svm`) untuk divalidasi dan diklasifikasikan ke dalam tiga kategori kesegaran (serta status penolakan jika objek bukan daging):
 
 | Label | Kode | Emoji | Warna |
 |-------|------|-------|-------|
-| Segar | `fresh` | ✅ | Hijau (`#3DDC84`) |
-| Setengah Segar | `half_fresh` | ⚠️ | Kuning (`#FFC93C`) |
-| Busuk | `spoiled` | ⛔ | Merah (`#FF4D4D`) |
+| Segar | `fresh` | ✅ | Hijau Rosemary (`#1E8E5A`) |
+| Setengah Segar | `half_fresh` | ⚠️ | Kuning Emas (`#F5B81E`) |
+| Busuk | `spoiled` | ⛔ | Merah Peringatan (`#D9363E`) |
+| Bukan Daging *(ditolak)* | `non_meat` | 🚫 | Burgundy (`#5C242C`) |
 
-Hasil scan dan salinan gambar disimpan secara lokal menggunakan **SQLite** sehingga riwayat tetap tersedia secara offline.
+Hasil scan daging yang valid dan salinan gambarnya disimpan secara lokal menggunakan **SQLite** sehingga riwayat tetap tersedia secara offline. Untuk objek `non_meat`, file salinan langsung dihapus dan hasil tidak dimasukkan ke riwayat.
 
 ---
 
@@ -114,41 +115,61 @@ MobileApps/
 │   └── presentation/                      ← Layer UI (bebas Dio, SQLite, & Data Layer)
 │       ├── shell_screen.dart              ← Wrapper navigasi (Bottom Nav Bar) + refresh riwayat
 │       ├── home/
-│       │   └── home_screen.dart           ← Halaman beranda
+│       │   ├── home_screen.dart           ← Orkestrator halaman beranda
+│       │   └── widgets/
+│       │       ├── home_hero_card.dart    ← Hero foto daging segar + CTA Mulai Cek
+│       │       └── home_section_cards.dart ← Kartu aksi cepat & rekomendasi penyimpanan
 │       ├── capture/
-│       │   └── capture_screen.dart        ← Ambil foto (kamera / galeri)
+│       │   ├── capture_screen.dart        ← Pengambilan foto & pemanggilan analisis AI
+│       │   └── widgets/
+│       │       ├── capture_action_card.dart ← Kartu tombol Kamera & Galeri
+│       │       └── capture_viewfinder.dart ← Viewfinder berdenyut & tips pengambilan foto
 │       ├── preview/
 │       │   └── preview_screen.dart        ← Pratinjau foto sebelum analisis
 │       ├── result/
-│       │   └── result_screen.dart         ← Tampilkan hasil klasifikasi
+│       │   ├── result_screen.dart         ← Orkestrator tampilan hasil / penolakan non-daging
+│       │   └── widgets/                   ← Sub-widget hasil (Verdict, Confidence, Probabilities, Non-Meat, Preview, Tombol)
+│       │       ├── freshness_result_cards.dart
+│       │       ├── non_meat_rejection_view.dart
+│       │       ├── result_action_button.dart
+│       │       └── result_image_preview.dart
 │       ├── history/
-│       │   └── history_screen.dart        ← Daftar riwayat semua scan
+│       │   ├── history_screen.dart        ← Daftar riwayat (CustomScrollView + SliverList.builder)
+│       │   └── widgets/
+│       │       └── history_card.dart      ← Kartu riwayat dengan thumbnail cacheWidth & layout Wrap anti-overflow
 │       ├── providers/                     ← State management
 │       │   ├── scan_provider.dart         ← State alur scan [DI via AnalyzeMeatUseCase]
 │       │   └── history_provider.dart      ← State halaman riwayat [DI via ClassificationRepository]
 │       ├── theme/                         ← Desain sistem & ekstensi UI
-│       │   ├── theme.dart                 ← Sistem desain Neobrutalism lengkap
-│       │   └── result_ui_ext.dart         ← Extension UI (statusColor, statusIcon) untuk entity
-│       └── widgets/                       ← Komponen UI reusable
-│           ├── confidence_bar.dart        ← Progress bar nilai confidence
-│           ├── neo_badge.dart             ← Badge label status kesegaran
-│           ├── neo_button.dart            ← Tombol neobrutalist + animasi
-│           ├── neo_card.dart              ← Card container neobrutalist
-│           └── neo_loading.dart           ← Loading overlay neobrutalist
+│       │   ├── theme.dart                 ← Palet warna Fresh Meat Culinary & tema Material 3
+│       │   └── result_ui_ext.dart         ← Extension UI (statusColor, statusIcon, statusAdvice)
+│       └── widgets/                       ← Komponen UI reusable lintas screen
+│           ├── curved_app_bar.dart        ← Header burgundy melengkung (Preview & Result)
+│           ├── loading_overlay.dart       ← Overlay loading modern (`AppLoadingOverlay`)
+│           ├── pressable_scale.dart       ← Pembungkus tekan interaktif (`AnimatedScale` + haptic)
+│           ├── safety_notice_card.dart    ← Kartu catatan keamanan pangan reusable
+│           ├── status_badge.dart          ← Badge pill status kesegaran (`StatusBadge`)
+│           └── vector_illustrations.dart  ← CustomPainter latar viewfinder & empty state
 │
 ├── android/                               ← Konfigurasi Android native (izin CAMERA, STORAGE, INTERNET)
 ├── assets/
+│   ├── images/
+│   │   └── hero_fresh_meat.jpg            ← Foto hero daging segar untuk Beranda
 │   └── model/                             ← Direktori asset model
-├── test/                                  ← Unit & widget tests (11 test)
+├── test/                                  ← Unit & widget tests (29 test)
 │   ├── analyze_meat_usecase_test.dart
+│   ├── classification_model_test.dart
 │   ├── format_test.dart
+│   ├── history_screen_test.dart
 │   ├── prediction_response_model_test.dart
+│   ├── redesign_screens_test.dart
 │   ├── remote_meat_classifier_repository_test.dart
 │   └── widget_test.dart
 ├── pubspec.yaml                           ← Deklarasi dependensi & assets
 ├── pubspec.lock                           ← Lock file versi dependensi
 ├── analysis_options.yaml                  ← Konfigurasi lint Dart
-├── README.md                              ← README proyek
+├── env.example.json                       ← Template --dart-define-from-file untuk build/run
+├── BUILDGUIDE.md                          ← Panduan konfigurasi & build APK (debug/release)
 └── DOKUMENTASI.md                         ← File ini
 ```
 
@@ -310,7 +331,7 @@ Hierarki exception internal khusus Data Layer (`AppException`, `InferenceExcepti
 
 #### `lib/data/models/prediction_response_model.dart`
 
-Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`). Menormalisasi label `'half-fresh'` → `'half_fresh'`, memetakan string model (`'netv2'`/`'svm'`) lewat `parseModelType(...)`, dan mengonversinya menjadi entity murni via `toEntity()`.
+Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`). Menormalisasi label `'half-fresh'` → `'half_fresh'`, memetakan string model (`'netv2'`/`'svm'`) lewat `parseModelType(...)`, membaca field validasi non-daging (`is_meat`, `reason`, `meat_coverage`), dan mengonversinya menjadi entity murni via `toEntity()`.
 
 ---
 
@@ -326,7 +347,7 @@ Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`).
 
 #### `lib/data/repositories/local_image_storage_repository.dart`
 
-`LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<timestamp>.ext` dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
+`LocalImageStorageRepository` mengimplementasikan `ImageStorageRepository`. Menyalin file gambar sementara (kamera/galeri) ke direktori privat `Documents/scan_images/scan_<timestamp>.ext`, menyediakan `deleteScanImage(imagePath)` untuk membersihkan salinan saat request gagal/non-daging, dan mendukung injeksi fungsi `getDocumentsDirectory` untuk testing.
 
 ---
 
@@ -334,7 +355,7 @@ Model JSON response dari endpoint FastAPI (`/predict/netv2` dan `/predict/svm`).
 
 #### `lib/domain/models/classification_result.dart`
 
-Entity murni yang merepresentasikan satu hasil scan (`id`, `imagePath`, `meatType`, `result`, `confidence`, `createdAt`) beserta helper murni Dart (`displayName`, `statusEmoji`, `isLowConfidence`, `confidencePercent`, `copyWith`).
+Entity murni yang merepresentasikan satu hasil scan (`id`, `imagePath`, `meatType`, `result`, `confidence`, `createdAt`, `modelType`, `probabilities`, `segmentationFallback`, `isMeat`, `rejectionReason`) beserta helper murni Dart (`displayName`, `statusEmoji`, `isLowConfidence`, `confidencePercent`, `copyWith`).
 
 #### `lib/domain/models/prediction_model_type.dart`
 
@@ -342,20 +363,21 @@ Enum identitas model bisnis `enum PredictionModelType { netv2, svm }` tanpa deta
 
 #### `lib/domain/models/prediction_output.dart`
 
-Entity hasil prediksi AI (`label`, `confidence`, `modelType`, `probabilities`, `segmentationFallback`).
+Entity hasil prediksi AI (`label`, `confidence`, `modelType`, `probabilities`, `segmentationFallback`, `isMeat`, `rejectionReason`, `meatCoverage`).
 
 #### Kontrak Repository (`lib/domain/repositories/`)
 - `classification_repository.dart` — kontrak `save`, `getAll`, `delete`, `deleteAll` berbasis `({..., Failure? failure})`.
 - `meat_classifier_repository.dart` — kontrak `classify({required imagePath, required modelType})`.
-- `image_storage_repository.dart` — kontrak `saveScanImage(sourcePath)`.
+- `image_storage_repository.dart` — kontrak `saveScanImage(sourcePath)` dan `deleteScanImage(imagePath)`.
 
 #### `lib/domain/usecases/analyze_meat_usecase.dart`
 
 Use case `AnalyzeMeatUseCase` yang mengorkestrasi 3 kontrak repository secara berurutan:
 1. Validasi path gambar (mengembalikan `ValidationFailure` jika kosong).
 2. Salin gambar ke penyimpanan lokal via `ImageStorageRepository`.
-3. Kirim gambar ke FastAPI sesuai `modelType` via `MeatClassifierRepository`.
-4. Simpan `ClassificationResult` ke SQLite via `ClassificationRepository`.
+3. Kirim gambar ke FastAPI sesuai `modelType` via `MeatClassifierRepository`. Jika gagal, salinan gambar langsung dihapus.
+4. Jika `!output.isMeat || output.label == 'non_meat'`, hapus salinan lokal, **lewati** penyimpanan SQLite, dan kembalikan `ClassificationResult(..., isMeat: false)`.
+5. Jika daging valid, simpan `ClassificationResult` ke SQLite via `ClassificationRepository`.
 
 ---
 
@@ -373,33 +395,37 @@ Mengelola state daftar riwayat (`items`, `filteredItems`, `activeFilter`, `searc
 
 ### 🖥️ Presentation Layer — Screens & Theme
 
-- `lib/presentation/shell_screen.dart` — Bottom Navigation Bar 3 tab (**BERANDA**, **PINDAI**, **RIWAYAT**) dengan `IndexedStack`; otomatis memanggil `HistoryProvider.loadHistory()` setiap kali tab **RIWAYAT** dipilih.
-- `lib/presentation/home/home_screen.dart` — Beranda dengan Hero Banner, tombol **MULAI CEK**, aksi cepat, disclaimer, dan rekomendasi penyimpanan.
-- `lib/presentation/capture/capture_screen.dart` — Pengambilan foto dari kamera/galeri, animasi pulse viewfinder, loading overlay `NeoLoading`, serta sinkronisasi `HistoryProvider.loadHistory()` segera setelah `analyzeImage()` sukses.
-- `lib/presentation/preview/preview_screen.dart` — Pratinjau foto sebelum analisis dijalankan.
-- `lib/presentation/result/result_screen.dart` — Menampilkan ID scan, preview foto, kartu verdict, bar confidence, peringatan low confidence, dan catatan keamanan.
-- `lib/presentation/history/history_screen.dart` — Pencarian, filter chip status, daftar riwayat (memakai `formatScanTimestamp`), serta hapus item.
-- `lib/presentation/theme/theme.dart` — Palet `AppColors`, `AppShadows`, `AppBorders`, `AppRadius`, `AppSpacing`, `AppTextStyles`, dan `buildAppTheme()`.
-- `lib/presentation/theme/result_ui_ext.dart` — Extension `ClassificationResultUiExt` (`statusColor`, `statusIcon`) khusus UI Flutter.
+- `lib/presentation/shell_screen.dart` — Bottom Navigation Bar 3 tab (**BERANDA**, **PINDAI**, **RIWAYAT**) dengan `IndexedStack` + `TickerMode` untuk menghentikan animasi `CaptureScreen` saat tab tidak aktif; otomatis memanggil `HistoryProvider.loadHistory()` setiap kali tab **RIWAYAT** dipilih.
+- `lib/presentation/home/home_screen.dart` — Beranda dengan hero foto daging segar (`hero_fresh_meat.jpg`) + gradasi merah daging, tombol **MULAI CEK**, aksi cepat (`PressableScale`), rekomendasi penyimpanan, dan `SafetyNoticeCard`.
+- `lib/presentation/capture/capture_screen.dart` — Header melengkung burgundy-ruby, viewfinder interaktif berdenyut, tips foto, pengambilan foto dari kamera/galeri, loading overlay `AppLoadingOverlay`, serta sinkronisasi `HistoryProvider.loadHistory()` saat hasil valid (`isMeat == true`).
+- `lib/presentation/preview/preview_screen.dart` — Menggunakan `CurvedAppBar` + *floating control sheet* pemilih model AI (`MOBILENET V2` / `SVM`).
+- `lib/presentation/result/result_screen.dart` — Orkestrator halaman hasil yang memisahkan sub-widget di `result/widgets/` (`VerdictCard`, `ConfidenceCard`, `ProbabilitiesCard`, `ResultImagePreview`, `NonMeatRejectionView`, `ResultActionButton`) serta memakai `CurvedAppBar` dan `SafetyNoticeCard`.
+- `lib/presentation/history/history_screen.dart` — Menggunakan `CustomScrollView` + `SliverList.builder` (*lazy-loading*) dengan `HistoryCard` di `history/widgets/`, pencarian nama/jenis/ID (`#MF-<id>`), filter chip status, serta hapus item.
+- `lib/presentation/theme/theme.dart` — Palet `AppColors`, `AppShadows`, `AppRadius`, `AppSpacing`, `AppTextStyles`, dan `buildAppTheme()`.
+- `lib/presentation/theme/result_ui_ext.dart` — Extension `ClassificationResultUiExt` (`statusColor`, `statusSoftColor`, `statusInkColor`, `statusIcon`, `statusAdvice`) khusus UI Flutter.
 
 ---
 
 ### 🎨 Presentation Layer — Widgets
 
 Terletak di `lib/presentation/widgets/`:
-- `confidence_bar.dart` — Progress bar segmented neobrutalism.
-- `neo_badge.dart` — Badge pill status (`FRESH`, `HALF-FRESH`, `SPOILED`).
-- `neo_button.dart` — Tombol neobrutalist dengan animasi press-down.
-- `neo_card.dart` — Container card neobrutalist.
-- `neo_loading.dart` — Overlay/inline loading indicator neobrutalism.
+- `curved_app_bar.dart` — Header burgundy melengkung reusable untuk halaman detail.
+- `loading_overlay.dart` — Overlay/inline loading indicator modern (`AppLoadingOverlay`).
+- `pressable_scale.dart` — Pembungkus animasi tekan lembut (`AnimatedScale` + haptic) lintas screen.
+- `safety_notice_card.dart` — Kartu catatan keamanan pangan reusable.
+- `status_badge.dart` — Badge pill status (`FRESH`, `HALF-FRESH`, `SPOILED`).
+- `vector_illustrations.dart` — `ScannerBackdropPainter` untuk viewfinder `CaptureScreen` dan `EmptyHistoryIllustration` untuk kondisi riwayat kosong.
 
 ---
 
 ### 🧪 Tests
 
-- `test/analyze_meat_usecase_test.dart` — Menguji skenario sukses `netv2`, sukses `svm`, `NetworkFailure`, dan `ValidationFailure` menggunakan fake repository.
-- `test/prediction_response_model_test.dart` — Menguji parsing JSON FastAPI (`/predict/netv2` & `/predict/svm`), normalisasi `'half-fresh'` → `'half_fresh'`, dan `segmentation_fallback`.
-- `test/remote_meat_classifier_repository_test.dart` — Menguji request multipart `Dio` ke `/predict/netv2`, `/predict/svm`, dan pemetaan HTTP 413 menjadi `ServerFailure` menggunakan fake `HttpClientAdapter`.
+- `test/analyze_meat_usecase_test.dart` — Menguji skenario sukses `netv2`, sukses `svm`, `NetworkFailure` + cleanup gambar, penolakan `non_meat` tanpa simpan SQLite, dan `ValidationFailure`.
+- `test/classification_model_test.dart` — Menguji serialisasi `toMap`/`fromMap`/`toEntity` SQLite v2 dan kompatibilitas baris v1.
+- `test/prediction_response_model_test.dart` — Menguji parsing JSON FastAPI (`/predict/netv2` & `/predict/svm`), normalisasi `'half-fresh'` → `'half_fresh'`, `segmentation_fallback`, dan respons penolakan `is_meat: false`.
+- `test/remote_meat_classifier_repository_test.dart` — Menguji request multipart `Dio`, normalisasi `baseUrl`, header `X-API-Key`, HTTP `401`/`403`/`413`/`429`, dan respons `non_meat` menggunakan fake `HttpClientAdapter`.
+- `test/history_screen_test.dart` — Widget regression test kartu `half_fresh` pada layar sempit `360dp`.
+- `test/redesign_screens_test.dart` — Widget test layar `HomeScreen`, `ShellScreen`, `CaptureScreen`, `PreviewScreen`, dan `ResultScreen` (termasuk tampilan penolakan non-daging) pada viewport `360dp`.
 - `test/format_test.dart` — Menguji fungsi murni `formatScanTimestamp`.
 - `test/widget_test.dart` — Smoke test rendering `MeatFreshApp` dengan wiring DI.
 
@@ -435,22 +461,24 @@ Terletak di `lib/presentation/widgets/`:
       │                    │ 1. LocalImageStorageRepository       │
       │                    │ 2. RemoteMeatClassifierRepository    │
       │                    │    (Dio POST /predict/netv2 | /svm)  │
-      │                    │ 3. ClassificationRepositoryImpl      │
-      │                    │    (Simpan ke SQLite)                │
+      │                    │ 3. Validasi is_meat                  │
       │                    └──────────────┬───────────────────────┘
       │                                   │
-      │                         ┌─────────┴──────────┐
-      │                         ▼                    ▼
-      │                   [SUCCESS]              [ERROR (Failure)]
-      │                       │                    │
-      │                       ▼                    ▼
-      │         HistoryProvider.loadHistory()  SnackBar pesan Failure
-      │                       │
-      │                       ▼
-      │               [ResultScreen]
-      │                       │
-      ▼                       ▼
-[HistoryScreen] ◄─────────────┘ (juga auto-refresh saat tab Riwayat dibuka)
+      │               ┌───────────────────┼───────────────────┐
+      │               ▼                   ▼                   ▼
+      │         [isMeat: true]     [isMeat: false]      [ERROR (Failure)]
+      │               │                   │                   │
+      │               ▼                   ▼                   ▼
+      │    Simpan ke SQLite       Hapus salinan       Hapus salinan +
+      │    + loadHistory()        (skip SQLite)       SnackBar Failure
+      │               │                   │
+      │               ▼                   ▼
+      │       [ResultScreen]      [ResultScreen]
+      │       (Verdict Segar/     (Kartu Penolakan
+      │        Half/Busuk)         Bukan Daging)
+      │               │
+      ▼               ▼
+[HistoryScreen] ◄─────┘ (auto-refresh saat tab Riwayat dibuka)
 ```
 
 ---
@@ -475,16 +503,16 @@ Terletak di `lib/presentation/widgets/`:
 
 ---
 
-## 8. Sistem Desain Neobrutalism
+## 8. Sistem Desain (Fresh Meat Culinary)
 
 | Elemen | Implementasi di MeatFresh AI |
 |--------|------------------------------|
-| **Border tebal** | Border hitam `#111111` ketebalan 1.5–3.5px |
-| **Hard offset shadow** | Blur = 0, offset solid 2×2 hingga 5×5 px berwarna hitam |
-| **Warna saturasi tinggi** | Merah primer `#B52603`, hijau `#3DDC84`, kuning `#FFC93C`, biru `#0054CB` |
-| **Tipografi bold** | SpaceGrotesk (headline/label) & PlusJakartaSans (body) |
-| **Animasi press-down** | Translate +2px saat ditekan + shadow mengecil ke `hardSmall` |
-| **Background krem** | Canvas `#FDF6EC` |
+| **Palet warna daging** | Merah ruby daging (`#A61D28` / `#7D121C`), burgundy plum (`#5C242C`), terracotta hangat (`#D96B43`), dan emas kontras tinggi (`#F5B81E`) |
+| **Warna semantik kesegaran** | Segar (`#1E8E5A`), Setengah Segar (`#F5B81E`), Busuk (`#D9363E`) |
+| **Permukaan & border** | Kanvas hangat `#FBF7F6`, kartu putih `#FFFFFF` dengan *hairline border* `#EFE3E1` dan sudut membulat (`12–28px`) |
+| **Elevasi & animasi** | *Soft ambient shadow*, *colored glow* pada CTA utama, animasi `AnimatedScale` + *haptic feedback* |
+| **Tipografi** | `PlusJakartaSans` dengan angka tabular untuk skor kepercayaan & probabilitas |
+| **Visual hero** | Foto daging segar penuh (`assets/images/hero_fresh_meat.jpg`) menyatu dengan gradasi merah daging |
 
 ---
 
@@ -516,10 +544,11 @@ Terletak di `lib/presentation/widgets/`:
 - [x] Error handling berbasis `Failure` + record (`NetworkFailure`, `ServerFailure`, `LocalFailure`, `ValidationFailure`)
 - [x] Use case bisnis `AnalyzeMeatUseCase` & injeksi dependensi terpusat di `main.dart`
 - [x] Database SQLite lokal (`meatfresh.db`) & sinkronisasi otomatis daftar riwayat setelah scan
-- [x] Sistem desain Neobrutalism & seluruh 5 layar UI (Home, Capture, Preview, Result, History)
+- [x] Sistem desain **Fresh Meat Culinary** & seluruh 5 layar UI (Home, Capture, Preview, Result, History)
 - [x] **UI pemilih model (`netv2` vs `svm`)** — pilihan model di `PreviewScreen` terhubung ke `ScanProvider.selectModel(...)`
 - [x] **Tampilan detail probabilitas & info SVM fallback** — `modelType`, `probabilities`, dan `segmentationFallback` disimpan di SQLite (v2) dan ditampilkan di `ResultScreen` serta `HistoryScreen`
-- [x] Unit tests (use case, repository Dio dengan mock adapter, response model, classification model, formatter) & widget test (13/13 lulus)
+- [x] **Validasi non-daging (Opsi C) & pembersihan *orphan image*** — `isMeat: false` ditolak di `ResultScreen` tanpa disimpan ke SQLite
+- [x] Unit & widget tests (`29/29` lulus) + E2E Appium (`AutomationTest/`, `4/4` spec lulus)
 - [x] Verifikasi `flutter analyze` bersih (`No issues found!`)
 
 ### 🚧 Masih TODO
@@ -554,9 +583,9 @@ Terletak di `lib/presentation/widgets/`:
 
 | # | Temuan | Lokasi | Solusi yang Disarankan |
 |---|--------|--------|------------------------|
-| 5 | **Pencarian berdasarkan ID tidak berfungsi** — placeholder menyebut `'CARI JENIS DAGING ATAU ID...'`, tetapi filter hanya mengecek `displayName` dan `meatType`. | `lib/presentation/providers/history_provider.dart` (`filteredItems`), `lib/presentation/history/history_screen.dart` | Tambahkan pencocokan terhadap `item.id.toString()` dan pola `#MF-<id>`. |
+| 5 | ~~**Pencarian berdasarkan ID tidak berfungsi**~~ — **✅ Selesai.** `HistoryProvider.filteredItems` kini mencocokkan ID numerik, pola `mf-<id>`, dan `#mf-<id>` (teruji di `history_screen_test.dart`). | `lib/presentation/providers/history_provider.dart` (`filteredItems`), `test/history_screen_test.dart` | Pencocokan ID `#MF-<id>` dan `id` numerik sudah aktif. |
 | 6 | **Kebocoran file gambar (*orphan files*)** — file tersalin ke `Documents/scan_images/` sebelum request API dan tidak dihapus saat API gagal maupun saat `delete(id)` / `deleteAll()`. | `lib/domain/usecases/analyze_meat_usecase.dart`, `lib/data/repositories/classification_repository.dart` | Hapus file salinan jika API gagal/non-daging, serta hapus file fisik gambar terkait saat catatan riwayat dihapus. |
-| 7 | **Loading overlay belum memblokir tombol Back & cancel request** — menekan Back saat proses analisis bisa mem-pop `PreviewScreen` dan memicu navigasi route yang salah. | `lib/presentation/widgets/neo_loading.dart`, `lib/presentation/capture/capture_screen.dart` | Bungkus overlay dengan `PopScope(canPop: false)` atau tambahkan mekanisme `CancelToken` Dio. |
+| 7 | **Loading overlay belum memblokir tombol Back & cancel request** — menekan Back saat proses analisis bisa mem-pop `PreviewScreen` dan memicu navigasi route yang salah. | `lib/presentation/widgets/loading_overlay.dart`, `lib/presentation/capture/capture_screen.dart` | Bungkus overlay dengan `PopScope(canPop: false)` atau tambahkan mekanisme `CancelToken` Dio. |
 | 8 | **Tombol `PINDAI LAGI` salah arah saat dibuka dari Riwayat** — `Navigator.pop(context)` mengembalikan user ke `HistoryScreen`, bukan ke `CaptureScreen`. | `lib/presentation/result/result_screen.dart`, `lib/presentation/history/history_screen.dart` | Arahkan `PINDAI LAGI` untuk kembali ke root lalu berpindah ke tab `PINDAI` (atau bedakan argumen asal navigasi). |
 | 9 | **Tombol `EKSPOR` masih placeholder & `deleteAll()` belum ada di UI** — tombol `EKSPOR` hanya menampilkan `"Fitur ekspor segera hadir"`. | `lib/presentation/history/history_screen.dart`, `lib/presentation/providers/history_provider.dart` | Implementasikan ekspor CSV/PDF (atau sembunyikan tombol sementara) dan tambahkan aksi `Hapus Semua` dengan konfirmasi. |
 
@@ -564,15 +593,15 @@ Terletak di `lib/presentation/widgets/`:
 
 - [ ] **Izin kamera/galeri eksplisit (`permission_handler`)** — tambahkan alur permintaan izin & tombol *"Buka Pengaturan"* (`openAppSettings()`) di `CaptureScreen` saat izin ditolak permanen.
 - [ ] **Navigasi Back & pintasan Beranda** — tambahkan `PopScope` di `ShellScreen` agar tombol Back di tab `PINDAI`/`RIWAYAT` kembali ke `BERANDA` dulu; bedakan pintasan `UNGGAH DARI GALERI` di `HomeScreen` dan beri aksi pada ikon perisai di AppBar.
-- [ ] **Efisiensi animasi `CaptureScreen`** — hentikan `_pulseController` saat tab `PINDAI` tidak aktif di `IndexedStack` untuk menghemat CPU/baterai.
+- [x] **Efisiensi animasi `CaptureScreen`** — `CaptureScreen` kini dibungkus `TickerMode(enabled: _currentIndex == 1, ...)` di `ShellScreen` sehingga `_pulseController` berhenti otomatis saat tab `PINDAI` tidak aktif.
 - [ ] **Resiliensi error & panduan pengguna** — tambahkan tombol `COBA LAGI` di `_buildErrorState` serta `RefreshIndicator` di `HistoryScreen`; tambahkan panduan pencahayaan (hindari lampu terlalu kuning hangat di mana akurasi SVM Lanjutan turun ke `60,98%`) serta input opsional `meat_type`.
 
 ### 🔵 P3 — Pengujian, Build & Dokumentasi
 
-- [ ] **Build ulang APK & regresi E2E pasca-redesain** — bangun ulang APK debug terbaru dan jalankan ulang `AutomationTest` (Appium) beserta skenario alur `PreviewScreen` → `SVM` → `ResultScreen`.
-- [ ] **Widget tests lanjutan & penyelarasan dokumen** — tambahkan widget test untuk `CaptureScreen`, `PreviewScreen`, `ResultScreen`, `HistoryScreen`, serta selaraskan `MobileApps/README.md`, `pubspec.yaml`, dan bagian arsitektur/desain pada `DOKUMENTASI.md` dengan kondisi terkini (FastAPI + modern *soft-UI*).
+- [x] **Build ulang APK & regresi E2E pasca-redesain** — `AutomationTest` (Appium + WebdriverIO + Allure) terpasang dan seluruh 4 spec (`home`, `capture`, `history`, `navigation`) lulus.
+- [ ] **Widget tests lanjutan & penyelarasan dokumen** — `DOKUMENTASI.md` dan `README.md` root sudah diselaraskan; tambahkan widget test interaksi penuh `CaptureScreen` serta selaraskan `pubspec.yaml` bila ada aset/nama baru.
 
 ---
 
-*Dokumentasi ini diperbarui berdasarkan analisis source code proyek MeatFresh AI (`MobileApps/`).*
-*Versi: 1.2.0 (FastAPI Dio + Clean Architecture & Failure Pattern) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*
+*Dokumentasi ini diperbarui berdasarkan analisis source code proyek MeatFresh AI (`MobileApps/` & `FastAPI/`).*
+*Versi: 1.3.0 (FastAPI Auth + Non-Meat Validation + Fresh Meat Culinary UI) | Flutter SDK: ^3.13.1 | Terakhir diperbarui: November 2026*
