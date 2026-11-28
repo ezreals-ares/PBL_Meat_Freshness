@@ -20,6 +20,7 @@ class ApiEndpoints {
 
   static const String predictNetV2 = '/predict/netv2';
   static const String predictSvm = '/predict/svm';
+  static const String health = '/health';
   static const int maxUploadBytes = 10 * 1024 * 1024;
 
   static const int _timeoutSeconds = int.fromEnvironment(

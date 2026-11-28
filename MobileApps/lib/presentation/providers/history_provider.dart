@@ -14,37 +14,33 @@ class HistoryProvider extends ChangeNotifier {
   List<ClassificationResult> _items = [];
   bool _isLoading = false;
   String _activeFilter = 'all';
-  String _searchQuery = '';
   String? _errorMessage;
+  bool _isSelectionMode = false;
+  final Set<int> _selectedIds = <int>{};
 
   // ─── Getters ──────────────────────────────────────────────
 
   List<ClassificationResult> get items => _items;
   bool get isLoading => _isLoading;
   String get activeFilter => _activeFilter;
-  String get searchQuery => _searchQuery;
   String? get errorMessage => _errorMessage;
+  bool get isSelectionMode => _isSelectionMode;
+  Set<int> get selectedIds => Set.unmodifiable(_selectedIds);
+  int get selectedCount => _selectedIds.length;
 
-  /// Items filtered by status and search query (mendukung nama, jenis daging, dan ID/#MF-ID).
+  bool isSelected(int? id) => id != null && _selectedIds.contains(id);
+
+  /// Apakah seluruh item pada filter aktif yang memiliki ID sudah dipilih.
+  bool get isAllFilteredSelected {
+    final selectableIds = filteredItems.map((e) => e.id).whereType<int>().toList();
+    if (selectableIds.isEmpty) return false;
+    return selectableIds.every(_selectedIds.contains);
+  }
+
+  /// Items filtered by freshness status.
   List<ClassificationResult> get filteredItems {
-    final query = _searchQuery.trim().toLowerCase();
-    return _items.where((item) {
-      final matchesFilter =
-          _activeFilter == 'all' || item.result == _activeFilter;
-      if (!matchesFilter) return false;
-      if (query.isEmpty) return true;
-
-      final id = item.id;
-      final matchesName = item.displayName.toLowerCase().contains(query);
-      final matchesMeat =
-          item.meatType?.toLowerCase().contains(query) ?? false;
-      final matchesId = id != null &&
-          (id.toString().contains(query) ||
-              'mf-$id'.contains(query) ||
-              '#mf-$id'.contains(query));
-
-      return matchesName || matchesMeat || matchesId;
-    }).toList();
+    if (_activeFilter == 'all') return List.unmodifiable(_items);
+    return _items.where((item) => item.result == _activeFilter).toList();
   }
 
   /// Count of each status for filter chips.
@@ -64,6 +60,11 @@ class HistoryProvider extends ChangeNotifier {
       _errorMessage = outcome.failure!.message;
     } else {
       _items = outcome.results;
+      final validIds = _items.map((e) => e.id).whereType<int>().toSet();
+      _selectedIds.removeWhere((id) => !validIds.contains(id));
+      if (_items.isEmpty) {
+        _isSelectionMode = false;
+      }
     }
 
     _isLoading = false;
@@ -77,6 +78,10 @@ class HistoryProvider extends ChangeNotifier {
       _errorMessage = failure.message;
     } else {
       _items.removeWhere((i) => i.id == id);
+      _selectedIds.remove(id);
+      if (_items.isEmpty) {
+        _isSelectionMode = false;
+      }
     }
     notifyListeners();
   }
@@ -88,26 +93,115 @@ class HistoryProvider extends ChangeNotifier {
       _errorMessage = failure.message;
     } else {
       _items = [];
+      _selectedIds.clear();
+      _isSelectionMode = false;
     }
     notifyListeners();
   }
 
+  // ─── Selection Actions ────────────────────────────────────
+
+  /// Aktifkan mode pilih banyak, opsional langsung menandai [initialId].
+  void enterSelectionMode({int? initialId}) {
+    _isSelectionMode = true;
+    if (initialId != null) {
+      _selectedIds.add(initialId);
+    }
+    notifyListeners();
+  }
+
+  /// Keluar dari mode pilih banyak dan bersihkan pilihan.
+  void exitSelectionMode() {
+    if (!_isSelectionMode && _selectedIds.isEmpty) return;
+    _isSelectionMode = false;
+    _selectedIds.clear();
+    notifyListeners();
+  }
+
+  /// Toggle status terpilih untuk satu item ber-ID [id].
+  void toggleSelection(int id) {
+    if (!_isSelectionMode) {
+      _isSelectionMode = true;
+    }
+    if (_selectedIds.contains(id)) {
+      _selectedIds.remove(id);
+    } else {
+      _selectedIds.add(id);
+    }
+    notifyListeners();
+  }
+
+  /// Pilih atau batalkan seluruh item yang terlihat pada filter aktif.
+  void toggleSelectAllFiltered() {
+    final visibleIds = filteredItems.map((e) => e.id).whereType<int>().toList();
+    if (visibleIds.isEmpty) return;
+
+    if (!_isSelectionMode) {
+      _isSelectionMode = true;
+    }
+
+    if (visibleIds.every(_selectedIds.contains)) {
+      _selectedIds.removeAll(visibleIds);
+    } else {
+      _selectedIds.addAll(visibleIds);
+    }
+    notifyListeners();
+  }
+
+  /// Hapus seluruh item yang dipilih dan kembalikan jumlah item yang terhapus.
+  Future<int> deleteSelected() async {
+    final targetIds = _selectedIds.toList();
+    if (targetIds.isEmpty) return 0;
+
+    final allIds = _items.map((e) => e.id).whereType<int>().toSet();
+    final deletesAll =
+        allIds.isNotEmpty && allIds.every(_selectedIds.contains);
+
+    if (deletesAll) {
+      final previousCount = _items.length;
+      final failure = await _repository.deleteAll();
+      if (failure != null) {
+        _errorMessage = failure.message;
+        notifyListeners();
+        return 0;
+      }
+      _items = [];
+      _selectedIds.clear();
+      _isSelectionMode = false;
+      notifyListeners();
+      return previousCount;
+    }
+
+    var deletedCount = 0;
+    for (final id in targetIds) {
+      final failure = await _repository.delete(id);
+      if (failure != null) {
+        _errorMessage = failure.message;
+        continue;
+      }
+      _items.removeWhere((item) => item.id == id);
+      _selectedIds.remove(id);
+      deletedCount++;
+    }
+
+    if (_selectedIds.isEmpty || _items.isEmpty) {
+      _isSelectionMode = false;
+    }
+    notifyListeners();
+    return deletedCount;
+  }
+
   /// Set the active filter.
   void setFilter(String filter) {
+    if (_activeFilter == filter) return;
     _activeFilter = filter;
     notifyListeners();
   }
 
-  /// Set the search query.
-  void setSearchQuery(String query) {
-    _searchQuery = query;
-    notifyListeners();
-  }
-
-  /// Clear search and filter.
+  /// Reset filter back to all.
   void resetFilters() {
+    if (_activeFilter == 'all') return;
     _activeFilter = 'all';
-    _searchQuery = '';
     notifyListeners();
   }
 }

@@ -33,7 +33,7 @@ AutomationTest/
 
 ```powershell
 cd ..\MobileApps
-flutter build apk --debug
+flutter build apk --debug --dart-define-from-file=env.json
 ```
 
 Path APK bawaan yang digunakan `wdio.conf.js` adalah `../MobileApps/build/app/outputs/flutter-apk/app-debug.apk` (package `com.meatfresh.ai`, activity `com.example.flutter_application_1.MainActivity`).

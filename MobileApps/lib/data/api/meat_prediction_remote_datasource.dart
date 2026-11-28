@@ -12,6 +12,9 @@ abstract class MeatPredictionRemoteDataSource {
     required String endpointPath,
     required String imagePath,
   });
+
+  /// Cek ketersediaan layanan backend lewat endpoint `/health`.
+  Future<void> checkHealth();
 }
 
 /// Implementasi [MeatPredictionRemoteDataSource] menggunakan library [Dio]
@@ -69,6 +72,26 @@ class MeatPredictionRemoteDataSourceImpl
         'Terjadi kesalahan saat memproses prediksi di server.',
         e,
       );
+    }
+  }
+
+  @override
+  Future<void> checkHealth() async {
+    try {
+      final response = await _dio.get<dynamic>(ApiEndpoints.health);
+      final statusCode = response.statusCode;
+      if (statusCode == null || statusCode < 200 || statusCode >= 300) {
+        throw NetworkException(
+          _extractErrorMessage(response, statusCode),
+          statusCode: statusCode,
+        );
+      }
+    } on AppException {
+      rethrow;
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } catch (e) {
+      throw InferenceException('Gagal memeriksa status server.', e);
     }
   }
 

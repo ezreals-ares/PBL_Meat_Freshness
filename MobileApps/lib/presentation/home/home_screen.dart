@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../settings/settings_screen.dart';
 import '../theme/theme.dart';
 import '../widgets/safety_notice_card.dart';
 import 'widgets/home_hero_card.dart';
@@ -24,7 +25,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildGreetingAppBar(),
+                _buildGreetingAppBar(context),
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.margin),
@@ -66,7 +67,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGreetingAppBar() {
+  Widget _buildGreetingAppBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.margin,
@@ -115,9 +116,14 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           HomeIconCircleAction(
-            icon: Icons.history_rounded,
-            tooltip: 'Buka Riwayat',
-            onTap: () => onNavigateToTab?.call(2),
+            icon: Icons.settings_rounded,
+            tooltip: 'Pengaturan',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
           ),
         ],
       ),

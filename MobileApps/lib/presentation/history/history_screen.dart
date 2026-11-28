@@ -17,20 +17,12 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final _searchController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryProvider>().loadHistory();
     });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   void _deleteItem(BuildContext context, ClassificationResult item) {
@@ -56,6 +48,79 @@ class _HistoryScreenState extends State<HistoryScreen> {
             },
             child: const Text(
               'HAPUS',
+              style: TextStyle(
+                color: AppColors.statusSpoiled,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteSelected(BuildContext context, int count) {
+    if (count == 0) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus $count Catatan Terpilih?'),
+        content: const Text(
+          'Semua catatan dan foto yang dipilih akan dihapus permanen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('BATAL'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final deleted =
+                  await context.read<HistoryProvider>().deleteSelected();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('$deleted catatan dihapus')),
+              );
+            },
+            child: const Text(
+              'HAPUS',
+              style: TextStyle(
+                color: AppColors.statusSpoiled,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAll(BuildContext context, int totalCount) {
+    if (totalCount == 0) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Semua Riwayat?'),
+        content: Text(
+          'Seluruh $totalCount catatan riwayat dan foto terkait akan dihapus permanen.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('BATAL'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<HistoryProvider>().deleteAll();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Seluruh riwayat dihapus')),
+              );
+            },
+            child: const Text(
+              'HAPUS SEMUA',
               style: TextStyle(
                 color: AppColors.statusSpoiled,
                 fontWeight: FontWeight.w700,
@@ -95,9 +160,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         children: [
                           _buildHeader(context, items.length),
                           const SizedBox(height: AppSpacing.md),
-                          _buildSearchBar(context, provider),
-                          const SizedBox(height: 14),
                           _buildFilterChips(context, provider, items),
+                          if (items.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            _buildSelectionActionBar(
+                              context,
+                              provider,
+                              items.length,
+                              filtered.isNotEmpty,
+                            ),
+                          ],
                           const SizedBox(height: AppSpacing.md),
                         ],
                       ),
@@ -154,7 +226,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: HistoryCard(
                               item: item,
+                              isSelectionMode: provider.isSelectionMode,
+                              isSelected: provider.isSelected(item.id),
                               onTap: () {
+                                if (provider.isSelectionMode) {
+                                  if (item.id != null) {
+                                    provider.toggleSelection(item.id!);
+                                  }
+                                  return;
+                                }
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -162,6 +242,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   ),
                                 );
                               },
+                              onLongPress: !provider.isSelectionMode &&
+                                      item.id != null
+                                  ? () {
+                                      HapticFeedback.mediumImpact();
+                                      provider.enterSelectionMode(
+                                        initialId: item.id,
+                                      );
+                                    }
+                                  : null,
                               onDelete: () => _deleteItem(context, item),
                             ),
                           );
@@ -248,88 +337,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ─── SEARCH BAR ───────────────────────────────────────────
-  Widget _buildSearchBar(BuildContext context, HistoryProvider provider) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppColors.bgSurface,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-              border: Border.all(color: AppColors.borderSubtle, width: 1),
-              boxShadow: [AppShadows.softSm()],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.search_rounded,
-                  size: 20,
-                  color: AppColors.tertiaryDark,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (v) => provider.setSearchQuery(v),
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Cari jenis daging atau ID...',
-                      hintStyle: AppTextStyles.bodySm.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-                if (provider.searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      provider.setSearchQuery('');
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.cancel_rounded,
-                        size: 18,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.primarySoft,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.16),
-              width: 1,
-            ),
-          ),
-          child: const Icon(
-            Icons.tune_rounded,
-            size: 20,
-            color: AppColors.primary,
-          ),
-        ),
-      ],
-    );
-  }
-
   // ─── FILTER CHIPS ─────────────────────────────────────────
   Widget _buildFilterChips(
     BuildContext context,
@@ -360,6 +367,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 15,
                   vertical: 9,
@@ -387,6 +395,247 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  // ─── SELECTION & BATCH DELETE BAR ─────────────────────────
+  Widget _buildSelectionActionBar(
+    BuildContext context,
+    HistoryProvider provider,
+    int totalCount,
+    bool hasVisibleItems,
+  ) {
+    if (!provider.isSelectionMode) {
+      return Row(
+        children: [
+          PressableScale(
+            pressedScale: 0.96,
+            onTap: () => provider.enterSelectionMode(),
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(color: AppColors.borderSubtle),
+                boxShadow: [AppShadows.softSm()],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.checklist_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'PILIH',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          PressableScale(
+            pressedScale: 0.96,
+            onTap: () => _confirmDeleteAll(context, totalCount),
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.statusSpoiledSoft,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                border: Border.all(
+                  color: AppColors.statusSpoiled.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.delete_sweep_rounded,
+                    size: 16,
+                    color: AppColors.statusSpoiled,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'HAPUS SEMUA',
+                    style: AppTextStyles.labelSm.copyWith(
+                      color: AppColors.statusSpoiledInk,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final allSelected = provider.isAllFilteredSelected;
+    final selectedCount = provider.selectedCount;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        boxShadow: [AppShadows.softSm()],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                onTap: hasVisibleItems
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        provider.toggleSelectAllFiltered();
+                      }
+                    : null,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        allSelected
+                            ? Icons.check_box_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                        size: 20,
+                        color: hasVisibleItems
+                            ? AppColors.primary
+                            : AppColors.textTertiary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        allSelected ? 'BATAL PILIH' : 'PILIH SEMUA',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  '$selectedCount DIPILIH',
+                  style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.primaryDark,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              PressableScale(
+                pressedScale: 0.97,
+                onTap: provider.exitSelectionMode,
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: AppColors.borderSubtle,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.close_rounded,
+                        size: 17,
+                        color: AppColors.textPrimary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'BATAL',
+                        style: AppTextStyles.labelSm.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: PressableScale(
+                  pressedScale: 0.98,
+                  onTap: selectedCount > 0
+                      ? () => _confirmDeleteSelected(context, selectedCount)
+                      : () {},
+                  child: Opacity(
+                    opacity: selectedCount > 0 ? 1.0 : 0.45,
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.statusSpoiled,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 17,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'HAPUS TERPILIH ($selectedCount)',
+                              style: AppTextStyles.labelSm.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -444,10 +693,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 18),
           PressableScale(
-            onTap: () {
-              context.read<HistoryProvider>().resetFilters();
-              _searchController.clear();
-            },
+            onTap: () => context.read<HistoryProvider>().resetFilters(),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
               decoration: BoxDecoration(

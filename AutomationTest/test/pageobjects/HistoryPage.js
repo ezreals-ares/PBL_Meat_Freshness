@@ -14,10 +14,6 @@ class HistoryPage extends BasePage {
     return this.byDescContains('EKSPOR');
   }
 
-  get searchInput() {
-    return $('android=new UiSelector().className("android.widget.EditText")');
-  }
-
   get filterAll() {
     return $('android=new UiSelector().descriptionMatches("^SEMUA \\(\\d+\\)$")');
   }
@@ -45,12 +41,6 @@ class HistoryPage extends BasePage {
   async waitForScreenLoaded() {
     await this.waitForVisible(this.headerTitle);
     await this.waitForVisible(this.sampleCountText);
-  }
-
-  async search(query) {
-    await this.waitForVisible(this.searchInput);
-    await this.searchInput.click();
-    await this.searchInput.setValue(query);
   }
 
   async tapResetFilter() {

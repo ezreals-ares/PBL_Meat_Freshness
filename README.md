@@ -20,11 +20,12 @@ PBL_Meat_Freshness/
 
 ## Fitur Utama
 
-- **Pindai & Pilih Model AI** — Ambil foto dari kamera atau unggah dari galeri, pilih model **MobileNetV2** (`NETV2`, Deep Learning CNN) atau **SVM** (Fitur Warna & Tekstur), lalu dapatkan hasil klasifikasi (`SEGAR` / `SETENGAH SEGAR` / `BUSUK`), skor kepercayaan, dan distribusi probabilitas per kelas.
-- **Riwayat Klasifikasi Lokal (SQLite)** — Menyimpan hasil pindai lengkap dengan foto lokal, model yang dipakai, timestamp, pencarian, filter status, dan hapus riwayat.
+- **Pindai, Pilih Model AI & Preview Fullscreen** — Ambil foto dari kamera atau unggah dari galeri, pilih model **MobileNetV2** (`NETV2`, Deep Learning CNN) atau **SVM** (Fitur Warna & Tekstur), dapatkan klasifikasi (`SEGAR` / `SETENGAH SEGAR` / `BUSUK`) beserta penolakan otomatis objek non-daging, skor kepercayaan, distribusi probabilitas, dan ketuk gambar hasil untuk tampilan *fullscreen pinch-to-zoom*.
+- **Riwayat Klasifikasi Lokal (SQLite)** — Menyimpan hasil pindai lengkap dengan foto lokal, model yang dipakai, timestamp, 4 filter status (`SEMUA`, `SEGAR`, `SETENGAH SEGAR`, `BUSUK`), serta mode pilih/pilih semua, hapus terpilih, dan hapus semua.
+- **Menu Pengaturan** — Mengatur model AI default, memeriksa status & latensi koneksi `/health` server AI, memantau/meminta izin kamera & galeri, serta panduan pengambilan foto akurat.
 - **Keamanan & Konfigurasi Produksi API** — Endpoint inferensi `/predict/netv2` dan `/predict/svm` dilindungi header `X-API-Key` dan *sliding-window rate limiting* di `FastAPI/`, serta injeksi konfigurasi `--dart-define-from-file=env.json` di `MobileApps/` tanpa URL hardcoded.
 - **Panduan Keamanan & Penyimpanan** — Informasi suhu chiller/freezer serta peringatan batasan analisis visual.
-- **Pengujian Otomatis** — Unit & widget test Flutter (`MobileApps/test/`), unit test keamanan FastAPI (`FastAPI/test_security.py`), dan E2E test Android (`AutomationTest/`).
+- **Pengujian Otomatis** — Unit & widget test Flutter (`MobileApps/test/`), unit test keamanan & validasi non-daging FastAPI (`FastAPI/test_security.py`, `FastAPI/test_meat_validator.py`), dan E2E test Android (`AutomationTest/`).
 
 ---
 
@@ -34,7 +35,7 @@ PBL_Meat_Freshness/
 2. **Backend (`FastAPI/`)** memvalidasi API key & batas rate limit, lalu menjalankan:
    - **MobileNetV2**: preprocessing citra `224×224` dan inferensi `.tflite` terkuantisasi (`ai-edge-litert`).
    - **SVM Lanjutan**: segmentasi area daging + ekstraksi fitur warna/tekstur (`183` fitur) dan klasifikasi probabilistik (`svm_meat_fitur_lanjutan.pkl`), dengan fallback ke seluruh frame jika segmentasi gagal (`segmentation_fallback`).
-3. **Hasil** dikembalikan ke aplikasi sebagai JSON (`label`, `confidence`, `probabilities`, `meat_type`, `segmentation_fallback`), ditampilkan di layar hasil, dan disimpan ke SQLite lokal.
+3. **Hasil** dikembalikan ke aplikasi sebagai JSON (`is_meat`, `label`, `confidence`, `probabilities`, `reason`, `meat_coverage`, `segmentation_fallback`), ditampilkan di layar hasil (atau kartu penolakan non-daging), dan riwayat daging valid disimpan ke SQLite lokal.
 
 ---
 
@@ -46,10 +47,10 @@ cd FastAPI
 copy .env.example .env   # isi API_KEY sesuai kebutuhan
 docker compose up -d --build
 ```
-Atau jalankan unit test keamanan:
+Atau jalankan unit test keamanan & validator non-daging:
 ```powershell
 cd FastAPI
-.\.venv\Scripts\python.exe -m unittest -v test_security.py
+.\.venv\Scripts\python.exe -m unittest -v test_security.py test_meat_validator.py
 ```
 
 ### 2. Aplikasi Mobile (`MobileApps/`)

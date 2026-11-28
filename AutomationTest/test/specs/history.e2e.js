@@ -1,9 +1,9 @@
-const { driver, expect } = require('@wdio/globals');
+const { expect } = require('@wdio/globals');
 const HomePage = require('../pageobjects/HomePage');
 const HistoryPage = require('../pageobjects/HistoryPage');
 
 describe('History Screen (Riwayat) - MeatFresh AI', () => {
-  it('harus menampilkan header, filter chip, kolom pencarian, dan reset filter', async () => {
+  it('harus menampilkan header dan 4 filter status (SEMUA, SEGAR, SETENGAH SEGAR, BUSUK)', async () => {
     await HomePage.waitForScreenLoaded();
     await HomePage.openRiwayat();
 
@@ -22,17 +22,15 @@ describe('History Screen (Riwayat) - MeatFresh AI', () => {
     }
     await expect(HistoryPage.filterSpoiled).toBeDisplayed();
 
-    // Uji input pencarian dan reset filter
-    await HistoryPage.search('tidak-ada-hasil-xyz');
-    await driver.hideKeyboard().catch(() => {});
+    // Uji klik filter status lalu kembali ke SEMUA
+    await HistoryPage.waitAndClick(HistoryPage.filterFresh);
+    if (await HistoryPage.emptyStateTitle.isExisting()) {
+      await HistoryPage.tapResetFilter();
+      await expect(HistoryPage.filterAll).toBeDisplayed();
+    } else {
+      await HistoryPage.waitAndClick(HistoryPage.filterAll);
+    }
 
-    await expect(HistoryPage.emptyStateTitle).toBeDisplayed();
-    await expect(HistoryPage.resetFilterButton).toBeDisplayed();
-
-    await HistoryPage.tapResetFilter();
     await expect(HistoryPage.headerTitle).toBeDisplayed();
-    await expect(HistoryPage.searchInput).not.toHaveText(
-      expect.stringContaining('tidak-ada-hasil-xyz')
-    );
   });
 });
