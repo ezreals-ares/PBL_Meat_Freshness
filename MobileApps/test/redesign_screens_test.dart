@@ -219,4 +219,45 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('ShellScreen melakukan animasi transisi antar tab dengan mulus pada 360dp',
+      (WidgetTester tester) async {
+    setNarrowPhoneViewport(tester);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => _buildScanProvider()),
+          ChangeNotifierProvider(
+            create: (_) =>
+                HistoryProvider(repository: _StubClassificationRepository()),
+          ),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: const ShellScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('MEATFRESH AI'), findsOneWidget);
+
+    await tester.tap(find.text('PINDAI'));
+    // CaptureScreen memiliki animasi pulse berulang (repeat) saat aktif,
+    // sehingga kita majukan frame eksplisit melampaui durasi transisi tab (280ms/300ms).
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text('ANALISIS VISUAL'), findsOneWidget);
+
+    await tester.tap(find.text('RIWAYAT').last);
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pumpAndSettle();
+    expect(find.text('RIWAYAT SCAN'), findsOneWidget);
+
+    await tester.tap(find.text('BERANDA'));
+    await tester.pumpAndSettle();
+    expect(find.text('MEATFRESH AI'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
