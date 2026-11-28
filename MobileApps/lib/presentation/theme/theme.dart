@@ -23,7 +23,6 @@ class AppColors {
 
   // ─── Warm Golden Accent (Primary CTAs) ─────────────────────
   static const Color accent = Color(0xFFF5B81E); // Warm Golden Amber
-  static const Color accentDark = Color(0xFFD19600);
   static const Color accentSoft = Color(0xFFFFF5DB);
   static const Color onAccent = Color(0xFF261315); // > 10:1 contrast on #F5B81E
   static const Color amberInk = Color(0xFF6A4300); // > 7:1 contrast on accentSoft
@@ -47,10 +46,7 @@ class AppColors {
   static const Color bgCanvas = Color(0xFFFBF7F6);
   static const Color bgSurface = Color(0xFFFFFFFF);
   static const Color surfaceContainer = Color(0xFFF5EEEC);
-  static const Color surfaceContainerHigh = Color(0xFFECE2DF);
   static const Color surfaceContainerHighest = Color(0xFFE3D6D2);
-  static const Color surfaceContainerLow = Color(0xFFF9F4F3);
-  static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
 
   // ─── Text Hierarchy (WCAG AA/AAA Compliant) ────────────────
   static const Color textPrimary = Color(0xFF241416);
@@ -61,7 +57,6 @@ class AppColors {
   static const Color borderSubtle = Color(0xFFEFE3E1);
   static const Color borderDefault = Color(0xFFE2D1CE);
   static const Color shadowBase = Color(0xFF3A0D12);
-  static const Color shadowHard = Color(0x143A0D12);
 
   // ─── Freshness Status Colors (Food-Safety Semantic) ────────
   static const Color statusFresh = Color(0xFF1E8E5A); // Rosemary Herb Green
@@ -107,23 +102,6 @@ class AppShadows {
         offset: const Offset(0, -4),
         blurRadius: 22,
       );
-
-  // Backward-compatible aliases mapped to soft ambient elevation
-  static BoxShadow hard({double x = 0, double y = 6, Color? color}) =>
-      softCard(color: color);
-
-  static BoxShadow hardSmall({Color? color}) => softSm(color: color);
-
-  static BoxShadow hardMedium({Color? color}) => softSm(color: color);
-
-  static BoxShadow hardLarge({Color? color}) => softCard(color: color);
-}
-
-class AppBorders {
-  static const double hairline = 1.0;
-  static const double thin = 1.2;
-  static const double medium = 1.5;
-  static const double thick = 2.0;
 }
 
 class AppRadius {
@@ -148,14 +126,6 @@ class AppTextStyles {
   static const String headlineFont = 'PlusJakartaSans';
   static const String bodyFont = 'PlusJakartaSans';
 
-  static const TextStyle headlineXlMobile = TextStyle(
-    fontFamily: headlineFont,
-    fontSize: 30,
-    fontWeight: FontWeight.w800,
-    height: 38 / 30,
-    letterSpacing: -0.6,
-    color: AppColors.textPrimary,
-  );
   static const TextStyle headlineLgMobile = TextStyle(
     fontFamily: headlineFont,
     fontSize: 24,

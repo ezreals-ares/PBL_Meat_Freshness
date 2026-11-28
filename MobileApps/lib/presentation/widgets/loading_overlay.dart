@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 import '../theme/theme.dart';
 
-/// Indikator loading modern dengan kartu putih melayang & aksen Emerald/Amber.
-class NeoLoading extends StatelessWidget {
+/// Indikator loading modern dengan kartu putih melayang & aksen ruby/amber.
+class AppLoadingOverlay extends StatelessWidget {
   final String text;
 
-  const NeoLoading({super.key, this.text = 'MENGANALISIS GAMBAR...'});
+  const AppLoadingOverlay({super.key, this.text = 'MENGANALISIS GAMBAR...'});
 
   // ─── Overlay management ───────────────────────────────────
   static OverlayEntry? _overlayEntry;
 
   /// Tampilkan loading overlay di atas layar aktif.
-  static void show(BuildContext context, {String text = 'MENGANALISIS GAMBAR...'}) {
+  static void show(
+    BuildContext context, {
+    String text = 'MENGANALISIS GAMBAR...',
+  }) {
     if (_overlayEntry != null) return;
     _overlayEntry = OverlayEntry(
       builder: (_) => Positioned.fill(
         child: Material(
           color: Colors.transparent,
-          child: NeoLoading(text: text),
+          child: AppLoadingOverlay(text: text),
         ),
       ),
     );
